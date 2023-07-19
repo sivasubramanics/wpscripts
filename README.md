@@ -37,3 +37,17 @@ Script to return if the file exits or not
 bash isFile.sh file.txt
 ```
 
+## simulate_reads.sh
+Script to simulate illumina paired end reads from model organism. This script downloads genome from ncbi and simulate WGS/RNA reads for a specified coverage.
+```bash
+bash simulate_reads.sh -t RNA -r yeast -o out -c 1 -n 2
+
+Usage: simulate_reads.sh [-h] [-t type] [-r ref] [-o out_dir] [-p threads]
+Options:
+  -t STR    type of reads (WGS or RNA)
+  -r STR    reference genome name (one of: 'yeast', 'fruitfly', 'human', 'mouse', 'arabidopsis', 'rice', 'zebrafish', 'maize', 'tomato', 'lettuce')
+  -o STR    output directory
+  -n INT    number of samples
+  -c FLT    coverage
+  -h        help
+```
