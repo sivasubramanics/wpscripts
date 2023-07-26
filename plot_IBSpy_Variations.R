@@ -6,6 +6,7 @@ tsv_file <- NULL
 chr <- NULL
 name <- NULL
 out_file <- NULL
+cutoff <- 10
 
 for (i in seq_along(args)) {
   if (args[i] == "--tsv" || args[i] == "-t") {
@@ -25,7 +26,7 @@ for (i in seq_along(args)) {
 }
 
 if (is.null(tsv_file) || is.null(chr) || is.null(name) || is.null(out_file)) {
-  stop("Usage: Rscript plot_IBSpy_variations.R --tsv variations.tsv --chr 1 --name LK002 --out LK002_chr2.jpeg")
+  stop("Usage: Rscript plot_IBSpy_variations.R --tsv variations.tsv --chr 1 --name LK002 --out LK002_chr2.jpeg --cutoff 100\n")
 }
 
 if(!require(ggplot2)) install.packages("ggplot2")
@@ -41,6 +42,7 @@ if (chr == "all") {
   is_facet <- TRUE
 } else {
   chr <- as.numeric(chr)
+  is_facet <- FALSE
 }
 print(chr)
 df$seqname <- as.factor(df$seqname)

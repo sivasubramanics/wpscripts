@@ -23,12 +23,39 @@ bash count_reads.sh in_dir
 Script to download fastq raw data from lettuceknow-release. The input meta data can be taken from the [sequencing update file](https://wageningenur4-my.sharepoint.com/:x:/r/personal/siva_selvanayagam_wur_nl/_layouts/15/Doc.aspx?sourcedoc=%7BB52F91B4-EBAD-4F31-83FE-6D368616B779%7D&file=SequencingDataMetadata_April_2023.xlsx&action=default&mobileredirect=true). Make sure you are running this in the server where already iRods is initialized (smith has it).
 ```bash
 python from_yoda.py -m LK087.tsv -d LK087 -t download -y /nluu6p/home/research-lettuceknow-releases/1_data-releases/data-release_V1_20220921/
+
+usage: from_yoda.py [-h] -m META_FILE -d DEST_DIR [-y YODA_DIR] -t {download,list} [-p THREADS]
+
+Get the raw data from YODA
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -m META_FILE, --meta_file META_FILE
+                        meta file
+  -d DEST_DIR, --dest_dir DEST_DIR
+                        destination directory
+  -y YODA_DIR, --yoda_dir YODA_DIR
+                        YODA entry directory
+  -t {download,list}, --task {download,list}
+                        task to perform: download, check
+  -p THREADS, --threads THREADS
+                        number of threads
 ```
 
 ## IBSpy_call_variation.sh
 Script to call kmer variation from fastq file by counting kmers using [kmc](https://github.com/refresh-bio/KMC) + [kmergwas](https://github.com/voichek/kmersGWAS) and variations using [IBSpy](https://github.com/Uauy-Lab/IBSpy).
 ```bash
 bash IBSpy_call_variation.sh -f LK001.fqlist -r genome.fa -o LK001 -p 12 -k 31 -w 50000
+
+Usage: IBSpy_call_variation.sh [-h] [-f fq.list] [-r ref.fa] [-o output] [-p threads] [-k kmer_size] [-w window_size]
+Options:
+  -f STR    list of fastq files
+  -r STR    reference genome
+  -o STR    output file
+  -p INT    number of threads
+  -k INT    kmer size
+  -w INT    window size
+  -h        help
 ```
 
 ## isFile.sh
