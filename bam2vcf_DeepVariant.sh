@@ -8,21 +8,26 @@
 set -u
 set -e
 
+sif="/lustre/BIF/nobackup/selva001/work/singularity_imgs/dv_1.5.0.sif"
 BIN_VERSION="1.5.0"
 threads=1
 chrom="all"
 
+# start clock
 start=$(date +%s)
 
+# print log
 print_log(){
     echo "[`date +'%Y-%m-%d %H:%M:%S'`] $1"
 }
 
+# run command
 run_cmd(){
     echo "[`date +'%Y-%m-%d %H:%M:%S'`] CMD: $1"
     eval $1
 }
 
+# convert seconds to hh:mm:ss
 seconds_to_hhmmss(){
     local seconds=$1
     local hours=$(printf "%02d" $((seconds / 3600)))
@@ -31,19 +36,21 @@ seconds_to_hhmmss(){
     echo "$hours:$minutes:$seconds"
 }
 
+# usage
 usage(){
     echo "Usage: $0 [-h] [-b bam] [-r ref.fa] [-o out_dir] [-p threads]"
     echo "Options:"
-    echo "  -s STR    deepvariant SIF file"
+    echo "  -s STR    deepvariant SIF file (eg: $sif)"
     echo "  -b STR    bam file"
     echo "  -r STR    reference genome"
     echo "  -o STR    output directory"
-    echo "  -c STR    chromosome name"
+    echo "  -c STR    chromosome name [or] file containing chromosome names [or] comma separated chromosome names"
     echo "  -p INT    number of threads"
     echo "  -h        help"
     exit 1
 }
 
+# get options
 while getopts "s:b:r:o:p:c:h" opt; do
     case $opt in
         s) sif=$OPTARG;;
@@ -57,26 +64,34 @@ while getopts "s:b:r:o:p:c:h" opt; do
     esac
 done
 
+# check options
 if [ $# -eq 0 ] || [ -z "$bam" ] || [ -z "$ref" ] || [ -z "$out_dir" ]; then
     usage
 fi
 
 # check tools
-for tool in samtools faSplit singularity parallel; do
+for tool in samtools bcftools singularity parallel; do
     if ! command -v $tool &> /dev/null; then
         echo "Error: $tool is not installed"
         exit 1
     fi
 done
 
+# check input files
 if [ ! -f $sif ]; then
     echo "Error: $sif not found"
     exit 1
 fi
 
+# check input files
 if [ ! -f $ref.fai ]; then
     print_log "indexing reference genome"
     run_cmd "samtools faidx $ref"
+fi
+
+if [ ! -f $bam.bai ]; then
+    print_log "indexing bam file"
+    run_cmd "samtools index $bam"
 fi
 
 # create output directory

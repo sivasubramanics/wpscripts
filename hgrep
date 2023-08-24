@@ -1,0 +1,9 @@
+#!/bin/bash
+# hgrep - grep with header line
+# Usage: hgrep <pattern> <file>
+# Example: hgrep foo bar.txt
+
+head -n 1 $2
+grep $1 $2
+
+

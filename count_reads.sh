@@ -13,13 +13,16 @@ check_command() {
 
 if [ $# -eq 0 ]
 then
-    echo "Usage: bash count_reads.sh /path/to/directory"
+    echo "Usage: bash count_reads.sh </path/to/directory> <file_ext>"
     exit 1
 fi
+
+rapidgzip_flag=0
 
 if check_command rapidgzip
 then
     unzip_exe=$(which rapidgzip)
+    rapidgzip_flag=1
 elif check_command pigz
 then
     unzip_exe=$(which pigz)
@@ -32,11 +35,24 @@ else
 fi
 
 path=$1
+file_ext=$2
 count=0
-for file in $(find $path -name "*.fastq.gz")
+n_files=0
+for file in $(find $path -name "*.$file_ext.gz")
 do
-    file_count=$($unzip_exe -kdc $file | wc -l)
+    n_files=$((n_files + 1))
+    if [ $n_files -eq 1 ]
+    then
+        echo "file,count"
+    fi
+    if [ $rapidgzip_flag -eq 1 ]
+    then
+        file_count=$($unzip_exe --count-lines $file 2> /dev/null)
+    else
+        file_count=$($unzip_exe -kdc $file | wc -l)
+    fi
     count=$((count + (file_count / 4)))
+    echo -e "$file,$count"
 done
-count=$((count / 2))
-echo -e "$path\t$count"
+# count=$((count / 2))
+# echo -e "$path\t$count"

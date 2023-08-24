@@ -1,0 +1,10 @@
+#!/bin/bash
+# script to list header columns of a tsv file
+# Usage: bash header <file.tsv>
+
+if [ $# -ne 1 ]; then
+    echo "Usage: $0 <file.tsv>"
+    exit 1
+fi
+
+head -n 1 $1 | tr '\t' '\n' | cat -n
