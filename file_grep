@@ -45,7 +45,7 @@ def get_dict_lookup(lookup_file, column):
     return lookup_list
 
 
-lookup_list = get_dict_lookup(args.lookup, args.key, args.value)
+lookup_list = get_dict_lookup(args.lookup, args.column)
 out_fo = open(args.output, "w")
 with open(args.input, 'r') as f:
     for line in f:
