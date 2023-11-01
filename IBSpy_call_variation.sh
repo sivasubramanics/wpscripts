@@ -14,10 +14,19 @@ run_cmd(){
     eval $1
 }
 
+seconds_to_hhmmss(){
+    local seconds=$1
+    local hours=$(printf "%02d" $((seconds / 3600)))
+    local minutes=$(printf "%02d" $(((seconds / 60) % 60)))
+    local seconds=$(printf "%02d" $((seconds % 60)))
+    echo "$hours:$minutes:$seconds"
+}
+
 usage(){
-    echo "Usage: $0 [-h] [-f fq.list] [-r ref.fa] [-o output] [-p threads] [-k kmer_size] [-w window_size]"
+    echo "Usage: $0 [-h] [-f fq.list] [-F fq_list] [-r ref.fa] [-o output] [-p threads] [-k kmer_size] [-w window_size]"
     echo "Options:"
     echo "  -f STR    list of fastq files"
+    echo "  -F STR    format (fq/fq_list/fa/fa_list/)"
     echo "  -r STR    reference genome"
     echo "  -o STR    output file"
     echo "  -p INT    number of threads"
@@ -34,9 +43,10 @@ check_exec(){
     fi
 }
 
-while getopts "f:r:o:p:k:w:h" opt; do
+while getopts "f:F:r:o:p:k:w:h" opt; do
     case $opt in
-        f) fq_list=$OPTARG;;
+        f) input=$OPTARG;;
+        F) format=$OPTARG;;
         r) ref=$OPTARG;;
         o) output=$OPTARG;;
         p) threads=$OPTARG;;
@@ -47,8 +57,21 @@ while getopts "f:r:o:p:k:w:h" opt; do
     esac
 done
 
-if [ -z "$fq_list" ] || [ -z "$ref" ] || [ -z "$output" ] || [ -z "$threads" ] || [ -z "$kmer_size" ] || [ -z "$window_size" ]; then
+if [ $# -eq 0 ] || [ -z "$input" ] || [ -z "$format" ] || [ -z "$ref" ] || [ -z "$output" ] || [ -z "$threads" ] || [ -z "$kmer_size" ] || [ -z "$window_size" ]; then
     usage
+fi
+
+if [ "$format" == "fq" ]; then
+    in_cmd="-fq $input"
+elif [ "$format" == "fq_list" ]; then
+    in_cmd="-fq @$input"
+elif [ "$format" == "fa" ]; then
+    in_cmd="-fa $input"
+elif [ "$format" == "fa_list" ]; then
+    in_cmd="-fa @$input"
+else
+    echo "Error: format should be fq/fq_list/fa/fa_list"
+    exit 1
 fi
 
 print_log "Checking tools"
@@ -59,10 +82,10 @@ print_log "Creating output directory $output"
 mkdir -p $output
 
 print_log "KMC canonized counting"
-run_cmd "kmc -k$kmer_size -t$threads -ci0 @$fq_list $output/canon $output" > $output/kmc.canon.log 2>&1
+run_cmd "kmc -k$kmer_size -t$threads -ci0 ${in_cmd} $output/canon $output" > $output/kmc.canon.log 2>&1
 
 print_log "KMC no canonized counting (all k-mers)"
-run_cmd "kmc -k$kmer_size -t$threads -ci0 -b @$fq_list $output/all $output" > $output/kmc.all.log 2>&1
+run_cmd "kmc -k$kmer_size -t$threads -ci0 -b ${in_cmd} $output/all $output" > $output/kmc.all.log 2>&1
 
 print_log "Adding strand information"
 run_cmd "$TOOLS_PATH/kmersGWAS/bin/kmers_add_strand_information -c $output/canon -n $output/all -k $kmer_size -o $output/kmc31" > $output/kmers_add_strand_information.log 2>&1
@@ -70,8 +93,10 @@ run_cmd "$TOOLS_PATH/kmersGWAS/bin/kmers_add_strand_information -c $output/canon
 print_log "IBScpp variant calling"
 run_cmd "$TOOLS_PATH/IBSpy/IBScpp/build/IBScpp -d $output/kmc31 -r $ref -p $threads -k $kmer_size -w $window_size > $output/variations.tsv" > $output/IBScpp.variations.log 2>&1
 
+# stop clock
 end=$(date +%s)
-runtime=$((end-start))
 
-print_log "Runtime: $runtime seconds"
+# print log
+print_log "elapsed time: $(seconds_to_hhmmss $((end - start)))"
 
+# END

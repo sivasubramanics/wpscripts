@@ -12,7 +12,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-f", "--fasta", help="input fasta file", required=True)
 parser.add_argument("-p", "--prefix", help="prefix to add to fasta headers", required=True)
 parser.add_argument("-o", "--output", help="output fasta file", required=True)
-parser.add_argument("-t", "--type", help="assembly type", choices=["trinity", "rnaspades"], required=True)
+parser.add_argument("-t", "--type", help="assembly type", choices=["trinity", "rnaspades", "fasta"], required=True)
 args = parser.parse_args()
 
 def get_ids(line, asm_type):
@@ -24,6 +24,9 @@ def get_ids(line, asm_type):
         # NODE_1_length_15401_cov_332.591075_g0_i0
         g_id = re.search(r"NODE_\d+_length_\d+_cov_\d+.\d+_(g\d+)_i\d+", line).group(1)
         t_id = re.search(r"(NODE_\d+_length_\d+_cov_\d+.\d+_g\d+_i\d+)", line).group(1)
+    elif asm_type == "fasta":
+        g_id = re.search(r"(.+)", line).group(1)
+        t_id = re.search(r"(.+)", line).group(1)
     else:
         print("Assembly type not recognized")
         sys.exit(1)

@@ -9,8 +9,10 @@ set -u
 set -e
 
 sif="/lustre/BIF/nobackup/selva001/work/singularity_imgs/dv_1.5.0.sif"
+gpu_sif="/lustre/BIF/nobackup/selva001/work/singularity_imgs/dv_1.5.0-gpu.sif"
 BIN_VERSION="1.5.0"
-threads=1
+threads=2
+is_gpu=0
 chrom="all"
 
 # start clock
@@ -51,7 +53,7 @@ usage(){
 }
 
 # get options
-while getopts "s:b:r:o:p:c:h" opt; do
+while getopts "s:b:r:o:p:c:hg" opt; do
     case $opt in
         s) sif=$OPTARG;;
         b) bam=$OPTARG;;
@@ -59,6 +61,7 @@ while getopts "s:b:r:o:p:c:h" opt; do
         o) out_dir=$OPTARG;;
         p) threads=$OPTARG;;
         c) chrom=$OPTARG;;
+        g) is_gpu=1;;
         h) usage;;
         *) usage;;
     esac
@@ -140,8 +143,12 @@ for chr in $chroms; do
         in_tmp_dir=$(realpath $out_dir/tmp/$chr/$reg_count)
         out_vcf_name=$chr/$reg_count.vcf.gz
         out_gvcf_name=$chr/$reg_count.g.vcf.gz
-
-        dv_cmd="singularity run -B /usr/lib/locale/:/usr/lib/locale/"
+        if [ $is_gpu -eq 1 ]; then
+            sif=$gpu_sif
+            dv_cmd="singularity run --nv -B /usr/lib/locale/:/usr/lib/locale/"
+        else
+            dv_cmd="singularity run -B /usr/lib/locale/:/usr/lib/locale/"
+        fi
         dv_cmd="${dv_cmd} -B $in_tmp_dir:/tmp" 
         dv_cmd="${dv_cmd} -B $in_bam_path:/bam"
         dv_cmd="${dv_cmd} -B $in_ref_path:/ref"

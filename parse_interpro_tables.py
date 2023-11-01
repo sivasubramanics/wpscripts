@@ -122,7 +122,6 @@ with open(interpro_tsv_file, 'r') as fh:
         data = line.rstrip().split("\t")
         if data[3] not in databases:
             continue
-
         if data[3] not in ann_dict:
             ann_dict[data[3]] = defaultdict()
         if data[0] not in ann_dict[data[3]]:

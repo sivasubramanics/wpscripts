@@ -41,7 +41,7 @@ if (chr == "all") {
   chr <- unique(df$seqname)
   is_facet <- TRUE
 } else {
-  chr <- as.numeric(chr)
+  # chr <- as.numeric(chr)
   is_facet <- FALSE
 }
 print(chr)
@@ -50,11 +50,12 @@ df <- df[df$seqname %in% chr, ]
 df$seqname <- as.factor(df$seqname)
 df$variations <- as.numeric(df$variations)
 # log2(max(df$variations))
+print(head(df))
 
 if (is_facet) {
   p <- ggplot(df, aes(x=start/1000000, y = variations, colour = variations < as.numeric(cutoff))) +
     geom_jitter(width = 0.3, size=0.2, alpha=0.9) +
-    scale_y_continuous(trans='log2') +
+    # scale_y_continuous(trans='log2') +
     labs(title=name,x ="Mbp", y = "variations") +
     theme(text=element_text(size=16,  family="Courier New")) +
     theme(plot.title = element_text(hjust = 0.5)) +
@@ -64,7 +65,7 @@ if (is_facet) {
 } else {
   p <- ggplot(df, aes(x=start/1000000, y = variations, colour = variations < as.numeric(cutoff))) +
     geom_jitter(width = 0.3, size=0.2, alpha=0.9) +
-    scale_y_continuous(trans='log2') +
+    # scale_y_continuous(trans='log2') +
     labs(title=name,x ="Mbp", y = "variations") +
     theme(text=element_text(size=16,  family="Courier New")) +
     theme(plot.title = element_text(hjust = 0.5)) +

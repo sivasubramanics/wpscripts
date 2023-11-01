@@ -101,7 +101,7 @@ args = parser.parse_args()
 in_deg = args.in_deg # eg: /Users/selva001/projects/bremia_rnaseq/DEG/counts/rb_genome/lsal_featurecounts_dge.tsv
 contrast = args.contrast
 out_prefix = args.out_prefix
-log2fc_cutoff = args.log2fc
+log2fc_cutoff = float(args.log2fc)
 pval_cutoff = float(args.pval)
 
 # read input file into dataframe
@@ -144,12 +144,13 @@ out_fh.write(f"sample,up,down\n")
 for (sample_name, sample_values) in dge_df.items():
     up = 0
     down = 0
+    print(f"sample_name: {sample_name}")
     for (gene_id, lfc) in sample_values.items():
         if lfc == 'NA':
             continue
         elif lfc >= log2fc_cutoff:
             up = up + 1
-        elif lfc <= -log2fc_cutoff:
+        elif lfc <= (log2fc_cutoff * -1):
             down = down + 1
         else:
             continue

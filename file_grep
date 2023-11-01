@@ -17,7 +17,8 @@ parser = argparse.ArgumentParser(description='print the lines from the input fil
 parser.add_argument('-i', '--input', help='Input file', required=True)
 parser.add_argument('-l', '--lookup', help='Lookup file', required=True)
 parser.add_argument('-o', '--output', help='Output file', required=True)
-parser.add_argument('-c', '--column', type=int, help='Column to lookup (in the Input file)', required=True)
+parser.add_argument('-c', '--column_l', type=int, help='Column to lookup', required=True)
+parser.add_argument('-d', '--column_i', type=int, help='Column to input file', required=True)
 args = parser.parse_args()
 
 
@@ -45,12 +46,12 @@ def get_dict_lookup(lookup_file, column):
     return lookup_list
 
 
-lookup_list = get_dict_lookup(args.lookup, args.column)
+lookup_list = get_dict_lookup(args.lookup, args.column_l)
 out_fo = open(args.output, "w")
 with open(args.input, 'r') as f:
     for line in f:
         line = line.strip()
         data = line.split('\t')
-        if data[args.column] in lookup_list:
+        if data[args.column_i] in lookup_list:
             out_fo.write(f"{line}\n")
 

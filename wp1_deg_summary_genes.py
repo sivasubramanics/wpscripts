@@ -32,6 +32,7 @@ def parse_blat(blat_psl, map_cov_cutoff, query_list=None, chr_dict=None):
                 if query_id not in blat_dict:
                     blat_dict[query_id] = []
                 blat_dict[query_id].append(f"{target_id}:{target_start}-{target_end}:{int(round(map_cov, 2)*100)}")
+    print(f"blat_dict ({blat_psl}): {len(blat_dict)} genes")
     return blat_dict
 
 def parse_gene_list(in_gene_list):
@@ -73,28 +74,14 @@ def parse_pfam_hmm(in_pfam_hmm):
     pfam_desc = ""
     with open(in_pfam_hmm, 'r') as f:
         for line in f:
-            line = line.strip()
-            if line.startswith("NAME"):
-                line = line.split()
-                pfam_name = line[1]
-            elif line.startswith("ACC"):
-                line = line.split()
-                pfam_acc = line[1].split(".")[0]
-                if pfam_acc not in pfam_hmm_dict:
-                    pfam_hmm_dict[pfam_acc] = {}
-                    pfam_hmm_dict[pfam_acc]['name'] = ""
-                    pfam_hmm_dict[pfam_acc]['desc'] = ""
-            elif line.startswith("DESC"):
-                line = line.split()
-                pfam_desc = " ".join(line[1:])
-            elif line.startswith("//"):
+            line = line.strip().split('\t')
+            pfam_acc = line[0]
+            pfam_name = line[1]
+            pfam_desc = line[2]
+            if pfam_acc not in pfam_hmm_dict:
+                pfam_hmm_dict[pfam_acc] = {}
                 pfam_hmm_dict[pfam_acc]['name'] = pfam_name
                 pfam_hmm_dict[pfam_acc]['desc'] = pfam_desc
-                pfam_acc = ""
-                pfam_name = ""
-                pfam_desc = ""
-            else:
-                continue
     return pfam_hmm_dict
 
 def parse_interpro(in_interpro):
@@ -159,7 +146,7 @@ def parse_annotations(in_annotations, annotations_dict, pfam_hmm_dict, interpro_
                     annotations_dict[gene_id].interpro_type.append(interpro_dict[interpro_id]['type'])
                     annotations_dict[gene_id].interpro_shortname.append(interpro_dict[interpro_id]['shortname'])
                     annotations_dict[gene_id].interpro_name.append(interpro_dict[interpro_id]['name'])
-
+    print(f"annotations_dict: {len(annotations_dict)} genes")
     return annotations_dict
 
 
@@ -168,7 +155,7 @@ def parse_fai(in_fai, seq_list=None):
     parse fai file and return a dictionary with seq_id as key and length as value
     """
     print(f"{in_fai} processing")
-    fo = open(f"{in_fai}.filtered", "w")
+    # fo = open(f"{in_fai}.filtered", "w")
     annotations_dict = {}
     with open(in_fai, 'r') as f:
         for line in f:
@@ -178,10 +165,11 @@ def parse_fai(in_fai, seq_list=None):
             if seq_list:
                 if seq_id not in seq_list:
                     continue
-            fo.write(f"{line[0]}\t{line[1]}\n")
+            # fo.write(f"{line[0]}\t{line[1]}\n")
             if seq_id not in annotations_dict:
                 annotations_dict[seq_id] = Annotation(seq_id)
             annotations_dict[seq_id].length = length
+    print(f"fai: {len(annotations_dict)} sequences")
     return annotations_dict
 
 def parse_dge(in_dge, gene_list=None):
@@ -207,6 +195,7 @@ def parse_dge(in_dge, gene_list=None):
             if sample not in dge_dict[gene_id]:
                 dge_dict[gene_id][sample] = {}
             dge_dict[gene_id][sample] = log2fc
+    print(f"dge_dict: {len(dge_dict)} genes")
     return dge_dict
 
 def parse_fasta(in_fasta, seq_list=None):
@@ -231,10 +220,33 @@ def parse_fasta(in_fasta, seq_list=None):
                 annotations_dict[seq_id].length += len(line)
     return annotations_dict
 
+def parse_gene2trans_map(in_gene2trans_map):
+    """
+    parse gene2tr.map file and return two dictionaries: gene2trans_map and trans2gene_map
+    """
+    print(f"{in_gene2trans_map} processing")
+    gene2trans_map = {}
+    trans2gene_map = {}
+    with open(in_gene2trans_map, 'r') as f:
+        for line in f:
+            line = line.strip().split()
+            gene_id = line[0]
+            trans_id = line[1]
+            if gene_id not in gene2trans_map:
+                gene2trans_map[gene_id] = []
+            gene2trans_map[gene_id].append(trans_id)
+            if trans_id not in trans2gene_map:
+                trans2gene_map[trans_id] = gene_id
+    print(f"gene2trans_map: {len(gene2trans_map)} genes")
+    print(f"trans2gene_map: {len(trans2gene_map)} transcripts")
+    return gene2trans_map, trans2gene_map
+            
+
+
 def main():
     samples = ["SAT8", "SAT12", "SAT24", "IL8", "IL12", "IL24", "SAL8", "SAL12", "SAL24"]
-    chr_names = "/lustre/BIF/nobackup/selva001/work/wp1/compile_data/chr.names"
-    pfam_hmm = "/lustre/BIF/nobackup/selva001/work/dbs/Pfam-A.hmm"
+    chr_names = "/lustre/BIF/nobackup/selva001/work/wp1/compile_data/misc/chr.names"
+    pfam_hmm = "/lustre/BIF/nobackup/selva001/work/dbs/Pfam/Pfam-A.hmm.tsv"
     interpro = "/lustre/BIF/nobackup/selva001/work/dbs/InterPro/interpro.tsv"
     
     if len(sys.argv) != 2:
@@ -244,75 +256,43 @@ def main():
 
     # specific for IL
     if sys.argv[1] == "IL":
-        blat_lsal = "/lustre/BIF/nobackup/selva001/work/wp1/compile_data/kraken2/IL_trinity.okay.cont.fasta_vs_lsal_pg.psl"
-        blat_lsat = "/lustre/BIF/nobackup/selva001/work/wp1/compile_data/kraken2/IL_trinity.okay.cont.fasta_vs_lsat_pg.psl"
-        blat_lsatv11 = "/lustre/BIF/nobackup/selva001/work/wp1/compile_data/kraken2/IL_trinity.okay.cont.fasta_vs_lsatv11.psl"
-        fasta = "/lustre/BIF/nobackup/selva001/work/wp1/compile_data/kraken2/IL_trinity.okay.cont.fasta"
-        in_gene_list = "/lustre/BIF/nobackup/selva001/work/wp1/compile_data/IL.ids"
-        annotations = "/lustre/BIF/nobackup/selva001/work/wp1/annotations/all_species_annotations/evigene_il.fasta.tsv"
-        dge = "/lustre/BIF/nobackup/selva001/work/wp1/compile_data/IL_deg.tsv"
-        out_file = "/lustre/BIF/nobackup/selva001/work/wp1/compile_data/IL.results.tsv"
+        in_dir = "/lustre/BIF/nobackup/selva001/work/wp1/compile_data/IL"
     if sys.argv[1] == "SAL":
-        blat_lsal = "/lustre/BIF/nobackup/selva001/work/wp1/compile_data/kraken2/SAL_trinity.okay.cont.fasta_vs_lsal_pg.psl"
-        blat_lsat = "/lustre/BIF/nobackup/selva001/work/wp1/compile_data/kraken2/SAL_trinity.okay.cont.fasta_vs_lsat_pg.psl"
-        blat_lsatv11 = "/lustre/BIF/nobackup/selva001/work/wp1/compile_data/kraken2/SAL_trinity.okay.cont.fasta_vs_lsatv11.psl"
-        fasta = "/lustre/BIF/nobackup/selva001/work/wp1/compile_data/kraken2/SAL_trinity.okay.cont.fasta"
-        in_gene_list = "/lustre/BIF/nobackup/selva001/work/wp1/compile_data/SAL.ids"
-        annotations = "/lustre/BIF/nobackup/selva001/work/wp1/annotations/all_species_annotations/evigene_sal.fasta.tsv"
-        dge = "/lustre/BIF/nobackup/selva001/work/wp1/compile_data/SAL_deg.tsv"
-        out_file = "/lustre/BIF/nobackup/selva001/work/wp1/compile_data/SAL.results.tsv"
+        in_dir = "/lustre/BIF/nobackup/selva001/work/wp1/compile_data/SAL"
     if sys.argv[1] == "SAT":
-        blat_lsal = "/lustre/BIF/nobackup/selva001/work/wp1/compile_data/kraken2/SAT_trinity.okay.cont.fasta_vs_lsal_pg.psl"
-        blat_lsat = "/lustre/BIF/nobackup/selva001/work/wp1/compile_data/kraken2/SAT_trinity.okay.cont.fasta_vs_lsat_pg.psl"
-        blat_lsatv11 = "/lustre/BIF/nobackup/selva001/work/wp1/compile_data/kraken2/SAT_trinity.okay.cont.fasta_vs_lsatv11.psl"
-        fasta = "/lustre/BIF/nobackup/selva001/work/wp1/compile_data/kraken2/SAT_trinity.okay.cont.fasta"
-        in_gene_list = "/lustre/BIF/nobackup/selva001/work/wp1/compile_data/SAT.ids"
-        annotations = "/lustre/BIF/nobackup/selva001/work/wp1/annotations/all_species_annotations/evigene_sat.fasta.tsv"
-        dge = "/lustre/BIF/nobackup/selva001/work/wp1/compile_data/SAT_deg.tsv"
-        out_file = "/lustre/BIF/nobackup/selva001/work/wp1/compile_data/SAT.results.tsv"
+        in_dir = "/lustre/BIF/nobackup/selva001/work/wp1/compile_data/SAT"
     if sys.argv[1] == "all_in_one":
-        blat_lsal = "/lustre/BIF/nobackup/selva001/work/wp1/compile_data/all_in_one_kraken2/all_in_one.cont.fasta_vs_lsal_pg.psl"
-        blat_lsat = "/lustre/BIF/nobackup/selva001/work/wp1/compile_data/all_in_one_kraken2/all_in_one.cont.fasta_vs_lsat_pg.psl"
-        blat_lsatv11 = "/lustre/BIF/nobackup/selva001/work/wp1/compile_data/all_in_one_kraken2/all_in_one.cont.fasta_vs_lsatv11.psl"
-        fasta = "/lustre/BIF/nobackup/selva001/work/wp1/compile_data/all_in_one_kraken2/all_in_one.cont.fasta"
-        in_gene_list = "/lustre/BIF/nobackup/selva001/work/wp1/compile_data/all_in_one.ids"
-        annotations = "/lustre/BIF/nobackup/selva001/work/wp1/annotations/all_species_annotations/evigene_all.fasta.tsv"
-        dge = "/lustre/BIF/nobackup/selva001/work/wp1/compile_data/all_in_one_deg.tsv"
-        out_file = "/lustre/BIF/nobackup/selva001/work/wp1/compile_data/all_in_one.results.tsv"
-    if sys.argv[1] == "lsatv11":
-        blat_lsal = "/lustre/BIF/nobackup/selva001/genomes/LSat_v11_ncbi/ncbi_dataset/data/GCF_002870075.4/rna.fna_vs_lsal_pg.psl"
-        blat_lsat = "/lustre/BIF/nobackup/selva001/genomes/LSat_v11_ncbi/ncbi_dataset/data/GCF_002870075.4/rna.fna_vs_lsat_pg.psl"
-        blat_lsatv11 = "/lustre/BIF/nobackup/selva001/genomes/LSat_v11_ncbi/ncbi_dataset/data/GCF_002870075.4/rna.fna_vs_lsatv11.psl"
-        fasta = "/lustre/BIF/nobackup/selva001/genomes/LSat_v11_ncbi/ncbi_dataset/data/GCF_002870075.4/rna.fna"
-        in_gene_list = "/lustre/BIF/nobackup/selva001/work/wp1/compile_data/lsat.ids"
-        annotations = "/lustre/BIF/nobackup/selva001/work/wp1/annotations/all_species_annotations/lsat_mod.fasta.tsv"
-        dge = "/lustre/BIF/nobackup/selva001/work/wp1/compile_data/lsat_deg.tsv"
-        out_file = "/lustre/BIF/nobackup/selva001/work/wp1/compile_data/lsat.results.tsv"
+        in_dir = "/lustre/BIF/nobackup/selva001/work/wp1/compile_data/all_in_one"
+    if sys.argv[1] == "lsat":
+        in_dir = "/lustre/BIF/nobackup/selva001/work/wp1/compile_data/lsat"
     if sys.argv[1] == "lsal":
-        blat_lsal = "/lustre/BIF/nobackup/selva001/genomes/LSal/resources/Lsal_rnd2.all.maker.transcripts.renamed.fasta_vs_lsal_pg.psl"
-        blat_lsat = "/lustre/BIF/nobackup/selva001/genomes/LSal/resources/Lsal_rnd2.all.maker.transcripts.renamed.fasta_vs_lsat_pg.psl"
-        blat_lsatv11 = "/lustre/BIF/nobackup/selva001/genomes/LSal/resources/Lsal_rnd2.all.maker.transcripts.renamed.fasta_vs_lsatv11.psl"
-        fasta = "/lustre/BIF/nobackup/selva001/genomes/LSal/resources/Lsal_rnd2.all.maker.transcripts.renamed.fasta"
-        in_gene_list = "/lustre/BIF/nobackup/selva001/work/wp1/compile_data/lsal.ids"
-        annotations = "/lustre/BIF/nobackup/selva001/work/wp1/annotations/all_species_annotations/lsal.fasta.tsv"
-        dge = "/lustre/BIF/nobackup/selva001/work/wp1/compile_data/lsal_deg.tsv"
-        out_file = "/lustre/BIF/nobackup/selva001/work/wp1/compile_data/lsal.results.tsv"
+        in_dir = "/lustre/BIF/nobackup/selva001/work/wp1/compile_data/lsal"
+    if sys.argv[1] == "eg":
+        in_dir = "/lustre/BIF/nobackup/selva001/work/wp1/compile_data/eg"
+
+    blat_lsal = os.path.join(in_dir, "isoforms_vs_lsalpg.psl")
+    blat_lsat = os.path.join(in_dir, "isoforms_vs_lsatpg.psl")
+    blat_lsatv11 = os.path.join(in_dir, "isoforms_vs_lsatv11.psl")
+    fasta = os.path.join(in_dir, "isoforms.fasta")
+    fai = os.path.join(in_dir, "isoforms.fasta.fai")
+    gene2trans_map = os.path.join(in_dir, "isoforms.gene2tr.map")
+    annotations = os.path.join(in_dir, "isoforms.ann.tsv")
+    dge = os.path.join(in_dir, "genes.deg.tsv")
+    in_gene_list = os.path.join(in_dir, "genes.ids")
+    out_file = os.path.join(in_dir, "genes.results.tsv")
 
 
     gene_list = parse_gene_list(in_gene_list)
-    annotations_dict = parse_fasta(fasta, gene_list)
+    annotations_dict = parse_fai(fai)
     chr_dict = parse_chr_names(chr_names)
-    blat_lsal_dict = parse_blat(blat_lsal, 0.8, gene_list, chr_dict)
-    blat_lsat_dict = parse_blat(blat_lsat, 0.8, gene_list, chr_dict)
-    blat_lsatv11_dict = parse_blat(blat_lsatv11, 0.8, gene_list, chr_dict)
+    blat_lsal_dict = parse_blat(blat_lsal, 0.8, None, chr_dict)
+    blat_lsat_dict = parse_blat(blat_lsat, 0.8, None, chr_dict)
+    blat_lsatv11_dict = parse_blat(blat_lsatv11, 0.8, None, chr_dict)
     pfam_hmm_dict = parse_pfam_hmm(pfam_hmm)
     interpro_dict = parse_interpro(interpro)
     annotations_dict = parse_annotations(annotations, annotations_dict, pfam_hmm_dict, interpro_dict)
+    gene2trans_dict, trans2gene_dict = parse_gene2trans_map(gene2trans_map)
     dge_dict = parse_dge(dge, gene_list)
-
-    print(f"number of genes before decont: {len(gene_list)}")
-    gene_list = list(set(gene_list) & set(annotations_dict.keys()))
-    print(f"number of genes after decont: {len(gene_list)}")
 
     fo = open(out_file, "w")
     fo.write(f"gene_id\tlength\tpfam_name\tinterpro_shortname\tlsal_pg\tlsat_pg\tlsatv11")
@@ -321,34 +301,58 @@ def main():
     fo.write(f"\n")
     for gene in gene_list:
         fo.write(f"{gene}")
-        fo.write(f"\t{annotations_dict[gene].length}")
+        # fo.write(f"\t{annotations_dict[gene].length}")
         # COLUMN 3: PFAM NAME
-        if annotations_dict[gene].pfam_name:
-            fo.write(f"\t{join_elements(annotations_dict[gene].pfam_name)}")
+        pfam_names = []
+        intrpro_shortnames = []
+        if gene in gene2trans_dict:
+            for trans_id in gene2trans_dict[gene]:
+                if trans_id in annotations_dict:
+                    for pfam_name in annotations_dict[trans_id].pfam_name:
+                        if pfam_name not in pfam_names:
+                            pfam_names.append(pfam_name)
+                    for interpro_shortname in annotations_dict[trans_id].interpro_shortname:
+                        if interpro_shortname not in intrpro_shortnames:
+                            intrpro_shortnames.append(interpro_shortname)
+        if pfam_names:
+            fo.write(f"\t{join_elements(pfam_names)}")
         else:
             fo.write(f"\t-")
 
         # COLUMN 4: INTERPRO SHORTNAME
-        if annotations_dict[gene].interpro_shortname:
-            fo.write(f"\t{join_elements(annotations_dict[gene].interpro_shortname)}")
+        if intrpro_shortnames:
+            fo.write(f"\t{join_elements(intrpro_shortnames)}")
         else:
             fo.write(f"\t-")
 
+
+        blat_lsal_pg = []
+        blat_lsat_pg = []
+        blat_lsatv11_pg = []
+        if gene in gene2trans_dict:
+            for trans_id in gene2trans_dict[gene]:
+                if trans_id in blat_lsal_dict:
+                    blat_lsal_pg += blat_lsal_dict[trans_id]
+                if trans_id in blat_lsat_dict:
+                    blat_lsat_pg += blat_lsat_dict[trans_id]
+                if trans_id in blat_lsatv11_dict:
+                    blat_lsatv11_pg += blat_lsatv11_dict[trans_id]
+
         # COLUMN 5: LSAL_PG
-        if gene in blat_lsal_dict:
-            fo.write(f"\t{join_elements(blat_lsal_dict[gene])}")
+        if blat_lsal_pg:
+            fo.write(f"\t{join_elements(blat_lsal_pg)}")
         else:
             fo.write(f"\t-")
 
         # COLUMN 6: LSAT_PG
-        if gene in blat_lsat_dict:
-            fo.write(f"\t{join_elements(blat_lsat_dict[gene])}")
+        if blat_lsat_pg:
+            fo.write(f"\t{join_elements(blat_lsat_pg)}")
         else:
             fo.write(f"\t-")
 
         # COLUMN 7-: LSATV11
-        if gene in blat_lsatv11_dict:
-            fo.write(f"\t{join_elements(blat_lsatv11_dict[gene])}")
+        if blat_lsatv11_pg:
+            fo.write(f"\t{join_elements(blat_lsatv11_pg)}")
         else:
             fo.write(f"\t-")
 
