@@ -4,14 +4,15 @@
 import argparse
 import sys
 import os
-from datetime       import datetime
-from collections    import defaultdict
+from datetime import datetime
+from collections import defaultdict
 
 
 class Annotation(object):
     """
     class to store annotation information
     """
+
     def __init__(self, gene_id):
         self.gene_id = gene_id
         self.ann = defaultdict(list)
@@ -39,10 +40,15 @@ class Annotation(object):
             self.ann['ko'].append('-')
         if len(self.ann['pfam']) == 0:
             self.ann['pfam'].append('-')
-        return f"{'; '.join(self.ann['desc'])}\t{'; '.join(self.ann['go'])}\t{'; '.join(self.ann['ko'])}\t{'; '.join(self.ann['pfam'])}"
-    
+        return f"{'; '.join(self.ann['desc'])}"\
+               f"\t{'; '.join(self.ann['go'])}"\
+               f"\t{'; '.join(self.ann['ko'])}"\
+               f"\t{'; '.join(self.ann['pfam'])}"
+
+
 class AnnotationParser(object):
     def __init__(self, reference, annotation_file):
+        self.annotations = None
         self.reference = reference
         self.annotation_file = annotation_file
         self.parse_annotation()
@@ -75,17 +81,20 @@ class AnnotationParser(object):
                 if line[ann_header.index('PFAMs')] != '-':
                     self.annotations[gene_id].add_ann('pfam', line[ann_header.index('PFAMs')])
 
+
 class Fasta(object):
     def __init__(self, name, sequence, description=None):
         self.name = name
         self.sequence = sequence.upper()
         self.description = description
-    
+
     def __str__(self):
         return f">{self.name} {self.description}\n{fold_sequence(self.sequence)}"
 
+
 class FastaParser(object):
     def __init__(self, fasta_file):
+        self.fasta = None
         self.fasta_file = fasta_file
         self.parse_fasta()
 
@@ -114,8 +123,12 @@ class FastaParser(object):
             self.fasta[name] = Fasta(name, sequence, description)
         print_log(f"Total sequences read ({self.fasta_file}): {len(self.fasta)}")
 
+
 class OrthogroupsParser(object):
     def __init__(self, orthogroups_file, iformat, fasta_dict=None, annotation_dict=None):
+        self.orthogroups_annotations = None
+        self.references = None
+        self.orthogroups = None
         self.orthogroups_file = orthogroups_file
         self.iformat = iformat
         self.fasta_dict = fasta_dict
@@ -124,7 +137,6 @@ class OrthogroupsParser(object):
         self.annotation_dict = annotation_dict
         if self.annotation_dict is not None:
             self.annotate_orthogroups()
-        
 
     def parse_orthogroups(self):
         if self.iformat == 'orthofinder':
@@ -136,7 +148,7 @@ class OrthogroupsParser(object):
         else:
             print_log(f"ERROR: Unknown orthogroups file format: {self.iformat}")
             sys.exit(1)
-        
+
     def parse_orthofinder(self):
         """
         read orthogroups file and store them in a dictionary
@@ -182,7 +194,7 @@ class OrthogroupsParser(object):
                         if line[i] in self.fasta_dict[reference].fasta:
                             self.orthogroups[line[0]][reference].append(line[i])
                             break
-    
+
     def parse_orthotable(self):
         """
         read orthogroups file and store them in a dictionary
@@ -203,8 +215,8 @@ class OrthogroupsParser(object):
                     continue
                 if og_format != 'orthotable':
                     print(f"ERROR: Orthogroups file format is not orthotable\n"
-                                    f"ERROR: Please provide orthogroups file in orthotable format\n"
-                                    f"ERROR: See {sys.argv[0]} convert --help for more details")
+                          f"ERROR: Please provide orthogroups file in orthotable format\n"
+                          f"ERROR: See {sys.argv[0]} convert --help for more details")
                     sys.exit(1)
                 if first_line:
                     first_line = False
@@ -220,7 +232,7 @@ class OrthogroupsParser(object):
                     else:
                         continue
                     n_genes += len(genes)
-                    self.orthogroups[line[0]][references[i-1]] = genes
+                    self.orthogroups[line[0]][references[i - 1]] = genes
 
     def write_orthogroup_table(self, output_prefix, references=None):
         """
@@ -254,13 +266,14 @@ class OrthogroupsParser(object):
                     total += len(self.orthogroups[orthogroup][reference])
                     f.write(f"\t{len(self.orthogroups[orthogroup][reference])}")
                 f.write(f"\t{total}\n")
-    
+
     def annotate_orthogroups(self):
         """
         annotate orthogroups with annotations
         """
         if self.annotation_dict is None:
-            raise Exception("Annotation dictionary is required for annotating orthogroups. please provide annotation files")
+            raise Exception(
+                "Annotation dictionary is required for annotating orthogroups. please provide annotation files")
         print_log(f"Annotating orthogroups")
         self.orthogroups_annotations = defaultdict(Annotation)
         for orthogroup in self.orthogroups:
@@ -273,13 +286,15 @@ class OrthogroupsParser(object):
                         continue
                     og_anns.append(self.annotation_dict[reference].annotations[gene_id])
             self.orthogroups_annotations[orthogroup] = combine_annotations(orthogroup, og_anns)
-    
+
     def write_og2tr_table(self, output_prefix):
         """
         write orthogroups to transcript table {og}\t{tr}\t{annotation}
         """
         if self.annotation_dict is None:
-            raise Exception("Annotation dictionary is required for writing orthogroups to transcript table. please provide annotation files")
+            raise Exception(
+                "Annotation dictionary is required for writing orthogroups to transcript table. please provide "
+                "annotation files")
         print_log(f"Writing orthogroups to transcript table: {output_prefix}.orthogroups.map.tsv")
         with open(f"{output_prefix}.orthogroups.map.tsv", 'w') as f:
             f.write(f"Orthogroup\tTranscript\tDescription\tGO\tKEGG\tPFAM\n")
@@ -294,19 +309,19 @@ class OrthogroupsParser(object):
                         else:
                             f.write(f"\t-\t-\t-\t-\n")
 
-        
     def write_orthogroups_annotations(self, output_prefix):
         """
         write orthogroups annotations {og}\t{annotation}
         """
         if self.annotation_dict is None:
-            raise Exception("Annotation dictionary is required for writing orthogroups annotations. please provide annotation files")
+            raise Exception(
+                "Annotation dictionary is required for writing orthogroups annotations. please provide annotation files")
         print_log(f"Writing orthogroups annotations: {output_prefix}.orthogroups.annotations.tsv")
         with open(f"{output_prefix}.orthogroups.annotations.tsv", 'w') as f:
             f.write(f"Orthogroup\tDescription\tGO\tKEGG\tPFAM\n")
             for orthogroup in sorted(self.orthogroups_annotations):
                 f.write(f"{self.orthogroups_annotations[orthogroup]}\n")
-    
+
     def summary(self):
         """
         print summary of the orthogroups
@@ -333,7 +348,7 @@ class OrthogroupsParser(object):
                 accessory_orthogroups += 1
             if num_genes_in_orthogroup == num_species and len(self.orthogroups[orthogroup]) == num_species:
                 single_copy_orthogroups += 1
-        
+
         outtable = []
         outtable.append(['Orthogroup file', os.path.basename(self.orthogroups_file)])
         outtable.append(['# references', num_species])
@@ -355,16 +370,17 @@ class OrthogroupsParser(object):
         for orthogroup in self.orthogroups:
             for reference in self.references:
                 self.og_genes[orthogroup] += self.orthogroups[orthogroup][reference]
-        
+
         for orthogroup in self.og_genes:
             if len(self.og_genes[orthogroup]) == 1:
                 singletons.append(self.og_genes[orthogroup][0])
                 continue
             for i in range(0, len(self.og_genes[orthogroup])):
-                for j in range(i+1, len(self.og_genes[orthogroup])):
+                for j in range(i + 1, len(self.og_genes[orthogroup])):
                     gene_pairs[self.og_genes[orthogroup][i]][self.og_genes[orthogroup][j]] += 1
                     gene_pairs[self.og_genes[orthogroup][j]][self.og_genes[orthogroup][i]] += 1
         return gene_pairs, singletons
+
 
 class DEG(object):
     def __init__(self, gene_id, log2fc, pvalue, padj):
@@ -385,9 +401,10 @@ class DEG(object):
             return True
         else:
             return False
-    
+
     def __str__(self):
         return f"{self.log2fc}\t{self.pvalue}\t{self.padj}"
+
 
 class DEGParser(object):
     def __init__(self, deg_file, iformat, annotation_dict=None):
@@ -395,7 +412,7 @@ class DEGParser(object):
         self.iformat = iformat
         self.annotation_dict = annotation_dict
         self.parse_deg()
-    
+
     def parse_deg(self):
         if self.iformat == 'edgeR':
             self.parse_edgeR()
@@ -404,7 +421,7 @@ class DEGParser(object):
         else:
             print_log(f"ERROR: Unknown deg file format: {self.iformat}")
             sys.exit(1)
-    
+
     def parse_deseq2(self):
         """
         read deg file and store them in a dictionary
@@ -428,7 +445,7 @@ class DEGParser(object):
                 pvalue = line[columns.index('pvalue')]
                 padj = line[columns.index('padj')]
                 self.deg[gene_id] = DEG(gene_id, log2fc, pvalue, padj)
-        
+
     def write_deg(self, output_prefix, lfc_cutoff=1, pvalue_cutoff=0.05):
         """
         write deg file
@@ -453,28 +470,46 @@ class DEGParser(object):
                             f.write(f"\t-\t-\t-\t-\n")
                 else:
                     f.write("\n")
-                    
+
+    def parse_edgeR(self):
+        pass
+
 
 class GeneToTransMap(object):
     """
     class object that holds, isoforms to gene id, or protein to gene id
     """
+
     def __init__(self, iso_id, gene_id):
         self.gene = gene_id
         self.isoform = iso_id
 
+
 class GeneToTransMapParser(object):
-    def __init__(self,)
+    def __init__(self, mapfile):
+        self.map = None
+        self.mapfile = mapfile
+        self.parse_mapfile()
+
+    def parse_mapfile(self):
+        self.map = defaultdict(GeneToTransMap)
+        print_log(f"Reading map file: {self.mapfile}")
+        with open(self.mapfile) as f:
+            for line in f:
+                line = line.rstrip().split("\t")
+                self.map[line[0]] = GeneToTransMap(line[0], line[1])
 
 
 def fold_sequence(sequence, width=60):
-    return "\n".join(sequence[i:i+width] for i in range(0, len(sequence), width))
+    return "\n".join(sequence[i:i + width] for i in range(0, len(sequence), width))
+
 
 def num2human(num):
     """
-    convert integer to human readable format. Every 3 digits add a comma
+    convert integer to human-readable format. Every 3 digits add a comma
     """
     return "{:,}".format(num)
+
 
 def tabulate(itable, header=False):
     """
@@ -485,14 +520,14 @@ def tabulate(itable, header=False):
     for row in itable:
         for item in row:
             if type(item) is int or type(item) is float:
-                # convert int to human readable format. Every 3 digits add a comma
+                # convert int to human-readable format. Every 3 digits add a comma
                 itable[itable.index(row)][row.index(item)] = num2human(item)
                 len_item = len(num2human(item))
             else:
                 len_item = len(str(item))
             if len_item > max_len:
                 max_len = len(str(item))
-    
+
     # add padding to each item in the list of list of strings
     for row in itable:
         for i in range(0, len(row)):
@@ -502,14 +537,15 @@ def tabulate(itable, header=False):
     i = 0
     for row in itable:
         if i == 0:
-            print_log('-+-'.join(['-'*max_len]*len(row)))
+            print_log('-+-'.join(['-' * max_len] * len(row)))
             print_log(' | '.join(row))
             if header:
-                print_log('-+-'.join(['-'*max_len]*len(row)))
+                print_log('-+-'.join(['-' * max_len] * len(row)))
         else:
             print_log(' | '.join(row))
         i += 1
-    print_log('-+-'.join(['-'*max_len]*len(row)))
+    print_log('-+-'.join(['-' * max_len] * len(row)))
+
 
 def combine_annotations(og_id, anns):
     """
@@ -521,11 +557,13 @@ def combine_annotations(og_id, anns):
             combined_ann.ann[ann_type] = list(set(combined_ann.ann[ann_type] + ann.ann[ann_type]))
     return combined_ann
 
+
 def print_log(msg):
     """
     print log messages
     """
     print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {msg}", file=sys.stderr)
+
 
 def strip_extension(filename):
     """
@@ -533,18 +571,19 @@ def strip_extension(filename):
     """
     return os.path.splitext(filename)[0]
 
+
 def compare_orthogroups(og_one, og_two):
     """
     compare orthogroups files and output a table with the number of shared gene-pairs
     """
     genes_pairs_1, singletons_1 = og_one.pairs()
     genes_pairs_2, singletons_2 = og_two.pairs()
-    total_pairs_1 = int(len(genes_pairs_1)/2)
-    total_pairs_2 = int(len(genes_pairs_2)/2)
-    
+    total_pairs_1 = int(len(genes_pairs_1) / 2)
+    total_pairs_2 = int(len(genes_pairs_2) / 2)
+
     # compare common pairs
     common_pairs = set(genes_pairs_1.keys()) & set(genes_pairs_2.keys())
-    true_pairs = int(len(common_pairs)/2)
+    true_pairs = int(len(common_pairs) / 2)
     # remove common_pairs from both the dictionaries
     for key in common_pairs:
         try:
@@ -554,7 +593,7 @@ def compare_orthogroups(og_one, og_two):
             del genes_pairs_2[(key[1], key[0])]
         except KeyError:
             pass
-    
+
     unique_pairs_1 = genes_pairs_1.keys()
     unique_pairs_2 = genes_pairs_2.keys()
 
@@ -573,46 +612,64 @@ def compare_orthogroups(og_one, og_two):
     out_table = [
         ["Orthogroups files", os.path.basename(og_one.orthogroups_file), os.path.basename(og_two.orthogroups_file)],
         ["Total Pairs", total_pairs_1, total_pairs_2],
-        ["True Pairs", f"{true_pairs} ({round(true_pairs/total_pairs_1 * 100, 2)}%)", f"{true_pairs} ({round(true_pairs/total_pairs_2 * 100, 2)}%)"],
+        ["True Pairs", f"{true_pairs} ({round(true_pairs / total_pairs_1 * 100, 2)}%)",
+         f"{true_pairs} ({round(true_pairs / total_pairs_2 * 100, 2)}%)"],
         ["Singletons", total_singletons_1, total_singletons_2],
-        ["True Singletons", f"{true_singletons} ({round(true_singletons/total_singletons_1 * 100, 2)}%)", f"{true_singletons} ({round(true_singletons/total_singletons_2 * 100, 2)}%)"],
+        ["True Singletons", f"{true_singletons} ({round(true_singletons / total_singletons_1 * 100, 2)}%)",
+         f"{true_singletons} ({round(true_singletons / total_singletons_2 * 100, 2)}%)"],
         ["Pair-Single", len(set(pair_single)), len(set(single_pair))]
     ]
     tabulate(out_table, header=True)
 
 
-
 def main():
     start_time = datetime.now()
-    parser = argparse.ArgumentParser(description='Compare orthogroups files and output a table with the number of shared orthogroups')
+    parser = argparse.ArgumentParser(
+        description='Compare orthogroups files and output a table with the number of shared orthogroups')
     subparsers = parser.add_subparsers(help='sub-command help', dest='command')
 
-    convert = subparsers.add_parser('convert', help='convert orthogroups file to a table', description='convert orthogroups file to a table')
+    convert = subparsers.add_parser('convert', help='convert orthogroups file to a table',
+                                    description='convert orthogroups file to a table')
     convert.add_argument('-i', '--input', help='input orthogroups file', required=True)
-    convert.add_argument('-x', '--format', help='input orthogroups file format', choices=['orthofinder', 'pantools', 'orthotable'], required=True)
-    convert.add_argument('-f', '--fasta', help='input fasta file(s). Make sure to provide fasta for all the species involved', required=True, nargs='+')
+    convert.add_argument('-x', '--format', help='input orthogroups file format',
+                         choices=['orthofinder', 'pantools', 'orthotable'], required=True)
+    convert.add_argument('-f', '--fasta',
+                         help='input fasta file(s). Make sure to provide fasta for all the species involved',
+                         required=True, nargs='+')
     convert.add_argument('-o', '--output', help='output prefix', required=True)
 
-    og2map = subparsers.add_parser('og2map', help='convert orthogroups file to a gene-transcript map format', description='convert orthogroups file to a gene-transcript map format')
+    og2map = subparsers.add_parser('og2map', help='convert orthogroups file to a gene-transcript map format',
+                                   description='convert orthogroups file to a gene-transcript map format')
     og2map.add_argument('-i', '--input', help='input orthogroups table file', required=True)
-    og2map.add_argument('-a', '--annotation', help='input annotation file(s). Make sure to provide annotation for all the species involved', required=True, nargs='+')
+    og2map.add_argument('-a', '--annotation',
+                        help='input annotation file(s). Make sure to provide annotation for all the species involved',
+                        required=True, nargs='+')
     og2map.add_argument('-o', '--output', help='output prefix', required=True)
 
-    summary = subparsers.add_parser('summary', help='print summary of orthogroups file', description='print summary of orthogroups file')
+    summary = subparsers.add_parser('summary', help='print summary of orthogroups file',
+                                    description='print summary of orthogroups file')
     summary.add_argument('-i', '--input', help='input orthogroups file', required=True)
 
-    compare = subparsers.add_parser('compare', help='compare orthogroups files and output a table with the number of shared gene pairs', description='compare orthogroups files and output a table with the number of shared gene pairs')
+    compare = subparsers.add_parser('compare',
+                                    help='compare orthogroups files and output a table with the number of shared gene '
+                                         'pairs',
+                                    description='compare orthogroups files and output a table with the number of '
+                                                'shared gene pairs')
     compare.add_argument('-i', '--input', help='input orthogroups file (in orthotable format)', required=True, nargs=2)
 
-    annotate_deg = subparsers.add_parser('annotate_deg', help='annotate differentially expressed genes', description='annotate differentially expressed genes')
+    annotate_deg = subparsers.add_parser('annotate_deg', help='annotate differentially expressed genes',
+                                         description='annotate differentially expressed genes')
     annotate_deg.add_argument('-i', '--input', help='input deg file', required=True)
-    annotate_deg.add_argument('-x', '--format', help='input deg file format', choices=['edgeR', 'deseq2'], required=True)
-    annotate_deg.add_argument('-a', '--annotation', help='input annotation file. Make sure to provide annotation for all the species involved', required=True)
+    annotate_deg.add_argument('-x', '--format', help='input deg file format', choices=['edgeR', 'deseq2'],
+                              required=True)
+    annotate_deg.add_argument('-a', '--annotation',
+                              help='input annotation file. Make sure to provide annotation for all the species involved',
+                              required=True)
     annotate_deg.add_argument('-o', '--output', help='output prefix', required=True)
     annotate_deg.add_argument('-l', '--lfc', help='log2 fold change cutoff', type=float, default=1)
     annotate_deg.add_argument('-p', '--pvalue', help='pvalue cutoff', type=float, default=0.05)
     annotate_deg.add_argument('-m', '--map', help='transcript to gene map file')
-    
+
     args = parser.parse_args(args=None if sys.argv[1:] else ['--help'])
 
     if args.command == 'convert':
@@ -644,27 +701,42 @@ def main():
         annotation_dict = defaultdict(AnnotationParser)
         reference = strip_extension(strip_extension(os.path.basename(args.annotation)))
         annotation_dict[reference] = AnnotationParser(reference, os.path.realpath(args.annotation))
-        map_dict = defaultdict(str)
         if args.map is not None:
-            with open(args.map) as f:
-                for line in f:
-                    line = line.rstrip().split()
-                    map_dict[line[1]] = line[0]
-        # add transcript to gene map to annotation dictionary
+            annotation_dict = isoforms_to_gene_ann(annotation_dict, args.map)
+
         deg = DEGParser(args.input, args.format, annotation_dict)
-        
+
         deg.write_deg(args.output, args.lfc, args.pvalue)
     else:
         parser.print_help()
         sys.exit(1)
 
-
     print_log(f"Total time taken: {datetime.now() - start_time}")
-        
-        
-        
 
-    
+
+def isoforms_to_gene_ann(annotation_dict, mapfile):
+    map_dict = defaultdict(GeneToTransMapParser)
+    reference = strip_extension(strip_extension(os.path.basename(mapfile)))
+    map_dict[reference] = GeneToTransMapParser(os.path.realpath(mapfile))
+    # change annotations from isofrom to gene, combine the isoforms annotation to gene annotation
+    for reference in annotation_dict:
+        for gene_id in annotation_dict[reference].annotations:
+            if gene_id in map_dict[reference].map:
+                gene = map_dict[reference].map[gene_id].gene
+                if gene in annotation_dict[reference].annotations:
+                    annotation_dict[reference].annotations[gene] = combine_annotations(gene,
+                                                                                       [annotation_dict[
+                                                                                            reference].annotations[
+                                                                                            gene],
+                                                                                        annotation_dict[
+                                                                                            reference].annotations[
+                                                                                            gene_id]])
+                else:
+                    annotation_dict[reference].annotations[gene] = annotation_dict[reference].annotations[
+                        gene_id]
+                del annotation_dict[reference].annotations[gene_id]
+    return annotation_dict
+
 
 if __name__ == '__main__':
     main()
