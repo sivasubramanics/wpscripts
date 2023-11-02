@@ -1,11 +1,21 @@
 #!/usr/bin/env python3
+# script to compare orthogroups files and output a table with the number of shared orthogroups
+# contact: siva.selvanayagam[at]wur.nl
+# data: 2023-10-20
+# version: 0.1
 
 
 import argparse
 import sys
 import os
+import re
 from datetime import datetime
 from collections import defaultdict
+
+
+# set gloabal constants
+PVALUE_CUTOFF = 0.05
+LFC_CUTOFF = 1
 
 
 class Annotation(object):
@@ -13,8 +23,8 @@ class Annotation(object):
     class to store annotation information
     """
 
-    def __init__(self, gene_id):
-        self.gene_id = gene_id
+    def __init__(self, attr_id):
+        self.attr_id = attr_id
         self.ann = defaultdict(list)
 
     def add_ann(self, ann_type, ann):
@@ -40,18 +50,21 @@ class Annotation(object):
             self.ann['ko'].append('-')
         if len(self.ann['pfam']) == 0:
             self.ann['pfam'].append('-')
-        return f"{'; '.join(self.ann['desc'])}"\
-               f"\t{'; '.join(self.ann['go'])}"\
-               f"\t{'; '.join(self.ann['ko'])}"\
+        return f"{'; '.join(self.ann['desc'])}" \
+               f"\t{'; '.join(self.ann['go'])}" \
+               f"\t{'; '.join(self.ann['ko'])}" \
                f"\t{'; '.join(self.ann['pfam'])}"
 
 
 class AnnotationParser(object):
-    def __init__(self, reference, annotation_file):
+    def __init__(self, reference, annotation_file, map_dict=None):
         self.annotations = None
         self.reference = reference
         self.annotation_file = annotation_file
         self.parse_annotation()
+        if map_dict is not None:
+            self.map_dict = map_dict
+            self.gene_annotations()
 
     def parse_annotation(self):
         """
@@ -60,7 +73,7 @@ class AnnotationParser(object):
         cmd to get this file: eggnog-mapper -i input.faa -m diamond --itype protein -d /path/to/eggnog/db -o output --cpu 8 --target_taxa 33090 --temp_dir tmp
         file name example: eggnog.mapper.annotations
         """
-        print_log(f"Reading annotation file: {self.annotation_file}")
+        print_log(f"Reading annotation file [{self.reference}]: {self.annotation_file}")
         self.annotations = defaultdict(Annotation)
         with open(self.annotation_file) as f:
             for line in f:
@@ -69,17 +82,17 @@ class AnnotationParser(object):
                     continue
                 if line[0].startswith('#'):
                     ann_header = line
-                gene_id = line[ann_header.index('#query')]
-                if gene_id not in self.annotations:
-                    self.annotations[gene_id] = Annotation(gene_id)
+                attr_id = line[ann_header.index('#query')]
+                if attr_id not in self.annotations:
+                    self.annotations[attr_id] = Annotation(attr_id)
                 if line[ann_header.index('Description')] != '-':
-                    self.annotations[gene_id].add_ann('desc', line[ann_header.index('Description')])
+                    self.annotations[attr_id].add_ann('desc', line[ann_header.index('Description')])
                 if line[ann_header.index('GOs')] != '-':
-                    self.annotations[gene_id].add_ann('go', line[ann_header.index('GOs')])
+                    self.annotations[attr_id].add_ann('go', line[ann_header.index('GOs')])
                 if line[ann_header.index('KEGG_Pathway')] != '-':
-                    self.annotations[gene_id].add_ann('kegg', line[ann_header.index('KEGG_Pathway')])
+                    self.annotations[attr_id].add_ann('kegg', line[ann_header.index('KEGG_Pathway')])
                 if line[ann_header.index('PFAMs')] != '-':
-                    self.annotations[gene_id].add_ann('pfam', line[ann_header.index('PFAMs')])
+                    self.annotations[attr_id].add_ann('pfam', line[ann_header.index('PFAMs')])
 
 
 class Fasta(object):
@@ -126,6 +139,7 @@ class FastaParser(object):
 
 class OrthogroupsParser(object):
     def __init__(self, orthogroups_file, iformat, fasta_dict=None, annotation_dict=None):
+        self.og_attributes = None
         self.orthogroups_annotations = None
         self.references = None
         self.orthogroups = None
@@ -163,11 +177,11 @@ class OrthogroupsParser(object):
         with open(self.orthogroups_file) as f:
             for line in f:
                 line = line.rstrip().split(": ")
-                gene_ids = line[1].split()
-                for gene_id in gene_ids:
+                attr_ids = line[1].split()
+                for attr_id in attr_ids:
                     for reference in self.fasta_dict:
-                        if gene_id in self.fasta_dict[reference].fasta:
-                            self.orthogroups[line[0]][reference].append(gene_id)
+                        if attr_id in self.fasta_dict[reference].fasta:
+                            self.orthogroups[line[0]][reference].append(attr_id)
                             break
 
     def parse_pantools(self):
@@ -205,7 +219,7 @@ class OrthogroupsParser(object):
         self.references = []
         print_log(f"Reading orthogroups file: {self.orthogroups_file}")
         first_line = True
-        n_genes = 0
+        n_attributes = 0
         og_format = None
         with open(self.orthogroups_file) as f:
             for line in f:
@@ -224,15 +238,15 @@ class OrthogroupsParser(object):
                     self.references.extend([reference for reference in references if reference not in self.references])
                     continue
                 for i in range(1, len(line)):
-                    genes = []
+                    attributes = []
                     if ',' in line[i]:
-                        genes = line[i].split(',')
+                        attributes = line[i].split(',')
                     elif line[i] != "":
-                        genes = [line[i]]
+                        attributes = [line[i]]
                     else:
                         continue
-                    n_genes += len(genes)
-                    self.orthogroups[line[0]][references[i - 1]] = genes
+                    n_attributes += len(attributes)
+                    self.orthogroups[line[0]][references[i - 1]] = attributes
 
     def write_orthogroup_table(self, output_prefix, references=None):
         """
@@ -302,10 +316,10 @@ class OrthogroupsParser(object):
                 for reference in self.orthogroups[orthogroup]:
                     if reference not in self.annotation_dict:
                         continue
-                    for gene_id in self.orthogroups[orthogroup][reference]:
-                        f.write(f"{orthogroup}\t{gene_id}")
-                        if gene_id in self.annotation_dict[reference].annotations:
-                            f.write(f"\t{self.annotation_dict[reference].annotations[gene_id]}\n")
+                    for attr_id in self.orthogroups[orthogroup][reference]:
+                        f.write(f"{orthogroup}\t{attr_id}")
+                        if attr_id in self.annotation_dict[reference].annotations:
+                            f.write(f"\t{self.annotation_dict[reference].annotations[attr_id]}\n")
                         else:
                             f.write(f"\t-\t-\t-\t-\n")
 
@@ -327,7 +341,7 @@ class OrthogroupsParser(object):
         print summary of the orthogroups
         """
         print_log(f"Summary of orthogroups file: {self.orthogroups_file}")
-        num_genes = 0
+        num_attributes = 0
         num_orthogroups = 0
         num_species = len(self.references)
         core_orthogroups = 0
@@ -336,68 +350,152 @@ class OrthogroupsParser(object):
         single_copy_orthogroups = 0
         for orthogroup in self.orthogroups:
             num_orthogroups += 1
-            num_genes_in_orthogroup = 0
+            num_attributes_in_orthogroup = 0
             for reference in self.orthogroups[orthogroup]:
-                num_genes_in_orthogroup += len(self.orthogroups[orthogroup][reference])
-                num_genes += len(self.orthogroups[orthogroup][reference])
+                num_attributes_in_orthogroup += len(self.orthogroups[orthogroup][reference])
+                num_attributes += len(self.orthogroups[orthogroup][reference])
             if len(self.orthogroups[orthogroup]) == num_species:
                 core_orthogroups += 1
             elif len(self.orthogroups[orthogroup]) == 1:
                 unique_orthogroups += 1
             else:
                 accessory_orthogroups += 1
-            if num_genes_in_orthogroup == num_species and len(self.orthogroups[orthogroup]) == num_species:
+            if num_attributes_in_orthogroup == num_species and len(self.orthogroups[orthogroup]) == num_species:
                 single_copy_orthogroups += 1
 
-        outtable = []
-        outtable.append(['Orthogroup file', os.path.basename(self.orthogroups_file)])
-        outtable.append(['# references', num_species])
-        outtable.append(['# genes', num_genes])
-        outtable.append(['# orthogroups', num_orthogroups])
-        outtable.append(['# core orthogroups', core_orthogroups])
-        outtable.append(['# accessory orthogroups', accessory_orthogroups])
-        outtable.append(['# unique orthogroups', unique_orthogroups])
-        outtable.append(['# single copy orthogroups', single_copy_orthogroups])
+        outtable = [['Orthogroup file', os.path.basename(self.orthogroups_file)], ['# references', num_species],
+                    ['# genes', num_attributes], ['# orthogroups', num_orthogroups],
+                    ['# core orthogroups', core_orthogroups], ['# accessory orthogroups', accessory_orthogroups],
+                    ['# unique orthogroups', unique_orthogroups],
+                    ['# single copy orthogroups', single_copy_orthogroups]]
         tabulate(outtable, header=True)
 
     def pairs(self):
         """
-        returns a dictionary of gene pairs from all orthogroups where gene_pairs[gene_a][gene_b] = 1, and list of singletons
+        returns a dictionary of gene pairs from all orthogroups where attribute_pairs[gene_a][gene_b] = 1, and list of singletons
         """
-        gene_pairs = defaultdict(lambda: defaultdict(int))
+        attribute_pairs = defaultdict(lambda: defaultdict(int))
         singletons = []
-        self.og_genes = defaultdict(list)
+        self.og_attributes = defaultdict(list)
         for orthogroup in self.orthogroups:
             for reference in self.references:
-                self.og_genes[orthogroup] += self.orthogroups[orthogroup][reference]
+                self.og_attributes[orthogroup] += self.orthogroups[orthogroup][reference]
 
-        for orthogroup in self.og_genes:
-            if len(self.og_genes[orthogroup]) == 1:
-                singletons.append(self.og_genes[orthogroup][0])
+        for orthogroup in self.og_attributes:
+            if len(self.og_attributes[orthogroup]) == 1:
+                singletons.append(self.og_attributes[orthogroup][0])
                 continue
-            for i in range(0, len(self.og_genes[orthogroup])):
-                for j in range(i + 1, len(self.og_genes[orthogroup])):
-                    gene_pairs[self.og_genes[orthogroup][i]][self.og_genes[orthogroup][j]] += 1
-                    gene_pairs[self.og_genes[orthogroup][j]][self.og_genes[orthogroup][i]] += 1
-        return gene_pairs, singletons
+            for i in range(0, len(self.og_attributes[orthogroup])):
+                for j in range(i + 1, len(self.og_attributes[orthogroup])):
+                    attribute_pairs[self.og_attributes[orthogroup][i]][self.og_attributes[orthogroup][j]] += 1
+                    attribute_pairs[self.og_attributes[orthogroup][j]][self.og_attributes[orthogroup][i]] += 1
+        return attribute_pairs, singletons
+
+    def summarize_DEGs(self, out_prefix, deg_dict, pvlaue_cutoff=PVALUE_CUTOFF, lfc_cutoff=LFC_CUTOFF):
+        """
+        compare the ogs and degs and write summary for each og in a tsv file for each sample
+        """
+        for reference in self.references:
+            if reference not in deg_dict:
+                continue
+            diff_dict = defaultdict(lambda : defaultdict(float))
+            for sample in deg_dict[reference]:
+                fo = open(f"{out_prefix}.{reference}_{sample}.orthogroups.summary.tsv", 'w')
+                fo.write(f"Orthogroup\tnum_attributes\tnum_deg\tnum_up\tnum_down\tratio_deg\tratio_up\tattributes"
+                         f"\tratio_down\tdiff")
+                if self.annotation_dict is not None:
+                    fo.write(f"\tDescription\tGO\tKEGG\tPFAM\n")
+                else:
+                    fo.write("\n")
+                for orthogroup in self.orthogroups:
+                    num_attributes = len(self.orthogroups[orthogroup][reference])
+                    num_deg = 0
+                    num_up = 0
+                    num_down = 0
+                    for attr_id in self.orthogroups[orthogroup][reference]:
+                        if attr_id in deg_dict[reference][sample].deg:
+                            if deg_dict[reference][sample].deg[attr_id].is_true(pvlaue_cutoff):
+                                num_deg += 1
+                                if deg_dict[reference][sample].deg[attr_id].is_up(lfc_cutoff):
+                                    num_up += 1
+                                elif deg_dict[reference][sample].deg[attr_id].is_down(lfc_cutoff):
+                                    num_down += 1
+                    if num_deg == 0:
+                        continue
+                    ratio_deg = round(num_deg / num_attributes, 2)
+                    ratio_up = round(num_up / num_attributes, 2)
+                    ratio_down = round(num_down / num_attributes, 2)
+                    diff = round(ratio_up - ratio_down, 2)
+                    fo.write(f"{orthogroup}\t"
+                             f"{num_attributes}\t"
+                             f"{num_deg}\t"
+                             f"{num_up}\t"
+                             f"{num_down}\t"
+                             f"{ratio_deg}\t"
+                             f"{ratio_up}\t"
+                             f"{ratio_down}\t"
+                             f"{diff}"
+                             f"\t{','.join(self.orthogroups[orthogroup][reference])}")
+                    if self.annotation_dict is not None:
+                        if orthogroup in self.orthogroups_annotations:
+                            fo.write(f"\t{self.orthogroups_annotations[orthogroup]}\n")
+                        else:
+                            fo.write(f"\t-\t-\t-\t-\n")
+                    else:
+                        fo.write("\n")
+                    diff_dict[orthogroup][sample] = diff
+                fo.close()
+            fr = open(f"{out_prefix}.{reference}.orthogroups.up-down.tsv", 'w')
+            fr.write(f"Orthogroup")
+            for sample in deg_dict[reference]:
+                fr.write(f"\t{sample}")
+            fr.write("\n")
+            for orthogroup in diff_dict:
+                fr.write(f"{orthogroup}")
+                for sample in deg_dict[reference]:
+                    fr.write(f"\t{diff_dict[orthogroup][sample]}")
+                if orthogroup in self.orthogroups_annotations:
+                    fr.write(f"\t{self.orthogroups_annotations[orthogroup]}\n")
+                else:
+                    fr.write(f"\t-\t-\t-\t-\n")
+            fr.close()
 
 
 class DEG(object):
-    def __init__(self, gene_id, log2fc, pvalue, padj):
-        self.gene_id = gene_id
+    def __init__(self, attr_id, log2fc, pvalue, padj):
+        self.attr_id = attr_id
         self.log2fc = log2fc
         self.pvalue = pvalue
         self.padj = padj
 
-    def is_true(self, lfc_cutoff, pvalue_cutoff):
+    def is_true(self, pvalue_cutoff=PVALUE_CUTOFF):
+        if self.padj == 'NA':
+            return False
+        if float(self.padj) <= pvalue_cutoff:
+            return True
+        else:
+            return False
+
+    def is_up(self, lfc_cutoff=LFC_CUTOFF):
         if self.log2fc == 'NA' or self.pvalue == 'NA' or self.padj == 'NA':
             return False
-        if self.log2fc == 'Inf' or self.log2fc == '-Inf':
-            if float(self.padj) <= pvalue_cutoff:
-                return True
-            else:
-                return False
-        if abs(float(self.log2fc)) >= lfc_cutoff and float(self.padj) <= pvalue_cutoff:
+        if self.log2fc == 'Inf':
+            return True
+        if self.log2fc == '-Inf':
+            return False
+        if float(self.log2fc) >= lfc_cutoff:
+            return True
+        else:
+            return False
+
+    def is_down(self, lfc_cutoff=LFC_CUTOFF):
+        if self.log2fc == 'NA' or self.pvalue == 'NA' or self.padj == 'NA':
+            return False
+        if self.log2fc == 'Inf':
+            return False
+        if self.log2fc == '-Inf':
+            return True
+        if float(self.log2fc) <= -lfc_cutoff:
             return True
         else:
             return False
@@ -407,11 +505,15 @@ class DEG(object):
 
 
 class DEGParser(object):
-    def __init__(self, deg_file, iformat, annotation_dict=None):
+    def __init__(self, deg_file, iformat, annotation_dict=None, lfc_cutoff=LFC_CUTOFF, pvalue_cutoff=PVALUE_CUTOFF):
+        self.deg = None
         self.deg_file = deg_file
         self.iformat = iformat
         self.annotation_dict = annotation_dict
+        self.lfc_cutoff = lfc_cutoff
+        self.pvalue_cutoff = pvalue_cutoff
         self.parse_deg()
+        self.summary()
 
     def parse_deg(self):
         if self.iformat == 'edgeR':
@@ -440,11 +542,41 @@ class DEGParser(object):
                     first_line = False
                     columns = line
                     continue
-                gene_id = line[0]
+                attr_id = line[0]
                 log2fc = line[columns.index('log2FoldChange')]
                 pvalue = line[columns.index('pvalue')]
                 padj = line[columns.index('padj')]
-                self.deg[gene_id] = DEG(gene_id, log2fc, pvalue, padj)
+                self.deg[attr_id] = DEG(attr_id, log2fc, pvalue, padj)
+
+    def summary(self):
+        """
+        print summary of the deg file,
+        number of genes/isoforms
+        number of degs (percentage)
+        number of up-regulated genes (percentage)
+        number of down-regulated genes (percentage)
+        """
+        print_log(f"Summary of deg file: {self.deg_file}")
+        num_attributes = len(self.deg)
+        num_deg = 0
+        num_up = 0
+        num_down = 0
+        for attr_id in self.deg:
+            if self.deg[attr_id].is_true(self.pvalue_cutoff):
+                num_deg += 1
+                if self.deg[attr_id].is_up(self.lfc_cutoff):
+                    num_up += 1
+                elif self.deg[attr_id].is_down(self.lfc_cutoff):
+                    num_down += 1
+        percentage_deg = int(num_deg / num_attributes * 100)
+        percentage_up = int(num_up / num_attributes * 100)
+        percentage_down = int(num_down / num_attributes * 100)
+        outtable = [['DEG file', os.path.basename(self.deg_file)],
+                    ['# attributes', f"{num2human(num_attributes)}"],
+                    ['# DEGs', f"{num2human(num_deg)} ({percentage_deg} %))"],
+                    ['# up-regulated', f"{num2human(num_up)} ({percentage_up} %)"],
+                    ['# down-regulated', f"{num2human(num_down)} ({percentage_down} %)"]]
+        tabulate(outtable, header=True)
 
     def write_deg(self, output_prefix, lfc_cutoff=1, pvalue_cutoff=0.05):
         """
@@ -457,14 +589,16 @@ class DEGParser(object):
                 f.write(f"\tDescription\tGO\tKEGG\tPFAM\n")
             else:
                 f.write("\n")
-            for gene_id in self.deg:
-                if not self.deg[gene_id].is_true(lfc_cutoff, pvalue_cutoff):
+            for attr_id in self.deg:
+                if not self.deg[attr_id].is_true(pvalue_cutoff):
                     continue
-                f.write(f"{gene_id}\t{self.deg[gene_id]}")
+                if not self.deg[attr_id].is_up(lfc_cutoff) and not self.deg[attr_id].is_down(lfc_cutoff):
+                    continue
+                f.write(f"{attr_id}\t{self.deg[attr_id]}")
                 if self.annotation_dict is not None:
                     for reference in self.annotation_dict:
-                        if gene_id in self.annotation_dict[reference].annotations:
-                            f.write(f"\t{self.annotation_dict[reference].annotations[gene_id]}\n")
+                        if attr_id in self.annotation_dict[reference].annotations:
+                            f.write(f"\t{self.annotation_dict[reference].annotations[attr_id]}\n")
                             break
                         else:
                             f.write(f"\t-\t-\t-\t-\n")
@@ -484,6 +618,15 @@ class GeneToTransMap(object):
         self.gene = gene_id
         self.isoform = iso_id
 
+    def __str__(self):
+        return f"{self.isoform}\t{self.gene}"
+
+    def gene_id(self):
+        return self.gene
+
+    def isoform_id(self):
+        return self.isoform
+
 
 class GeneToTransMapParser(object):
     def __init__(self, mapfile):
@@ -492,12 +635,25 @@ class GeneToTransMapParser(object):
         self.parse_mapfile()
 
     def parse_mapfile(self):
-        self.map = defaultdict(GeneToTransMap)
+        """
+        read map file and store them in a dictionary
+        map file format: isoform_id\tgene_id
+        """
+        self.map = defaultdict(list)
         print_log(f"Reading map file: {self.mapfile}")
         with open(self.mapfile) as f:
             for line in f:
-                line = line.rstrip().split("\t")
-                self.map[line[0]] = GeneToTransMap(line[0], line[1])
+                line = line.rstrip().split()
+                if line[0] not in self.map:
+                    print(f"Map: {line[0]}")
+                    self.map[line[0]] = []
+                self.map[line[0]].append(GeneToTransMap(line[1], line[0]))
+
+    def get_attrs(self, gene_id):
+        if gene_id not in self.map:
+            return []
+        for gene_map in self.map[gene_id]:
+            yield gene_map.isoform_id()
 
 
 def fold_sequence(sequence, width=60):
@@ -576,29 +732,29 @@ def compare_orthogroups(og_one, og_two):
     """
     compare orthogroups files and output a table with the number of shared gene-pairs
     """
-    genes_pairs_1, singletons_1 = og_one.pairs()
-    genes_pairs_2, singletons_2 = og_two.pairs()
-    total_pairs_1 = int(len(genes_pairs_1) / 2)
-    total_pairs_2 = int(len(genes_pairs_2) / 2)
+    attribute_pairs_1, singletons_1 = og_one.pairs()
+    attribute_pairs_2, singletons_2 = og_two.pairs()
+    total_pairs_1 = int(len(attribute_pairs_1) / 2)
+    total_pairs_2 = int(len(attribute_pairs_2) / 2)
 
     # compare common pairs
-    common_pairs = set(genes_pairs_1.keys()) & set(genes_pairs_2.keys())
+    common_pairs = set(attribute_pairs_1.keys()) & set(attribute_pairs_2.keys())
     true_pairs = int(len(common_pairs) / 2)
     # remove common_pairs from both the dictionaries
     for key in common_pairs:
         try:
-            del genes_pairs_1[key]
-            del genes_pairs_2[key]
-            del genes_pairs_1[(key[1], key[0])]
-            del genes_pairs_2[(key[1], key[0])]
+            del attribute_pairs_1[key]
+            del attribute_pairs_2[key]
+            del attribute_pairs_1[(key[1], key[0])]
+            del attribute_pairs_2[(key[1], key[0])]
         except KeyError:
             pass
 
-    unique_pairs_1 = genes_pairs_1.keys()
-    unique_pairs_2 = genes_pairs_2.keys()
+    unique_pairs_1 = attribute_pairs_1.keys()
+    unique_pairs_2 = attribute_pairs_2.keys()
 
-    genes_in_pairs_1 = list(set([key[0] for key in unique_pairs_1] + [key[1] for key in unique_pairs_1]))
-    genes_in_pairs_2 = list(set([key[0] for key in unique_pairs_2] + [key[1] for key in unique_pairs_2]))
+    attributes_in_pairs_1 = list(set([key[0] for key in unique_pairs_1] + [key[1] for key in unique_pairs_1]))
+    attributes_in_pairs_2 = list(set([key[0] for key in unique_pairs_2] + [key[1] for key in unique_pairs_2]))
 
     total_singletons_1 = len(singletons_1)
     total_singletons_2 = len(singletons_2)
@@ -606,8 +762,8 @@ def compare_orthogroups(og_one, og_two):
     # compare singletons
     true_singletons = len(list(set(singletons_1) & set(singletons_2)))
 
-    pair_single = list(set(genes_in_pairs_1) & set(singletons_2))
-    single_pair = list(set(genes_in_pairs_2) & set(singletons_1))
+    pair_single = list(set(attributes_in_pairs_1) & set(singletons_2))
+    single_pair = list(set(attributes_in_pairs_2) & set(singletons_1))
 
     out_table = [
         ["Orthogroups files", os.path.basename(og_one.orthogroups_file), os.path.basename(og_two.orthogroups_file)],
@@ -626,49 +782,110 @@ def main():
     start_time = datetime.now()
     parser = argparse.ArgumentParser(
         description='Compare orthogroups files and output a table with the number of shared orthogroups')
-    subparsers = parser.add_subparsers(help='sub-command help', dest='command')
+    subparsers = parser.add_subparsers(help='sub-command help',
+                                       dest='command')
 
-    convert = subparsers.add_parser('convert', help='convert orthogroups file to a table',
+    convert = subparsers.add_parser('convert',
+                                    help='convert orthogroups file to a table',
                                     description='convert orthogroups file to a table')
-    convert.add_argument('-i', '--input', help='input orthogroups file', required=True)
-    convert.add_argument('-x', '--format', help='input orthogroups file format',
-                         choices=['orthofinder', 'pantools', 'orthotable'], required=True)
+    convert.add_argument('-i', '--input',
+                         help='input orthogroups file',
+                         required=True)
+    convert.add_argument('-x', '--format',
+                         help='input orthogroups file format',
+                         choices=['orthofinder', 'pantools', 'orthotable'],
+                         required=True)
     convert.add_argument('-f', '--fasta',
                          help='input fasta file(s). Make sure to provide fasta for all the species involved',
-                         required=True, nargs='+')
-    convert.add_argument('-o', '--output', help='output prefix', required=True)
+                         required=True,
+                         nargs='+')
+    convert.add_argument('-o', '--output',
+                         help='output prefix',
+                         required=True)
 
-    og2map = subparsers.add_parser('og2map', help='convert orthogroups file to a gene-transcript map format',
+    og2map = subparsers.add_parser('og2map',
+                                   help='convert orthogroups file to a gene-transcript map format',
                                    description='convert orthogroups file to a gene-transcript map format')
-    og2map.add_argument('-i', '--input', help='input orthogroups table file', required=True)
+    og2map.add_argument('-i', '--input',
+                        help='input orthogroups table file',
+                        required=True)
     og2map.add_argument('-a', '--annotation',
                         help='input annotation file(s). Make sure to provide annotation for all the species involved',
-                        required=True, nargs='+')
-    og2map.add_argument('-o', '--output', help='output prefix', required=True)
+                        required=True,
+                        nargs='+')
+    og2map.add_argument('-o', '--output',
+                        help='output prefix',
+                        required=True)
 
-    summary = subparsers.add_parser('summary', help='print summary of orthogroups file',
+    summary = subparsers.add_parser('summary',
+                                    help='print summary of orthogroups file',
                                     description='print summary of orthogroups file')
-    summary.add_argument('-i', '--input', help='input orthogroups file', required=True)
+    summary.add_argument('-i', '--input',
+                         help='input orthogroups file',
+                         required=True)
 
     compare = subparsers.add_parser('compare',
                                     help='compare orthogroups files and output a table with the number of shared gene '
                                          'pairs',
                                     description='compare orthogroups files and output a table with the number of '
                                                 'shared gene pairs')
-    compare.add_argument('-i', '--input', help='input orthogroups file (in orthotable format)', required=True, nargs=2)
+    compare.add_argument('-i', '--input',
+                         help='input orthogroups file (in orthotable format)',
+                         required=True,
+                         nargs=2)
 
-    annotate_deg = subparsers.add_parser('annotate_deg', help='annotate differentially expressed genes',
+    annotate_deg = subparsers.add_parser('annotate_deg',
+                                         help='annotate differentially expressed genes',
                                          description='annotate differentially expressed genes')
-    annotate_deg.add_argument('-i', '--input', help='input deg file', required=True)
-    annotate_deg.add_argument('-x', '--format', help='input deg file format', choices=['edgeR', 'deseq2'],
+    annotate_deg.add_argument('-i', '--input',
+                              help='input deg file',
+                              required=True)
+    annotate_deg.add_argument('-x', '--format',
+                              help='input deg file format',
+                              choices=['edgeR', 'deseq2'],
                               required=True)
     annotate_deg.add_argument('-a', '--annotation',
                               help='input annotation file. Make sure to provide annotation for all the species involved',
                               required=True)
-    annotate_deg.add_argument('-o', '--output', help='output prefix', required=True)
-    annotate_deg.add_argument('-l', '--lfc', help='log2 fold change cutoff', type=float, default=1)
-    annotate_deg.add_argument('-p', '--pvalue', help='pvalue cutoff', type=float, default=0.05)
-    annotate_deg.add_argument('-m', '--map', help='transcript to gene map file')
+    annotate_deg.add_argument('-o', '--output',
+                              help='output prefix',
+                              required=True)
+    annotate_deg.add_argument('-l', '--lfc',
+                              help='log2 fold change cutoff',
+                              type=float,
+                              default=LFC_CUTOFF)
+    annotate_deg.add_argument('-p', '--pvalue',
+                              help='pvalue cutoff',
+                              type=float,
+                              default=PVALUE_CUTOFF)
+    annotate_deg.add_argument('-m', '--map',
+                              help='transcript to gene map file in {gene_id}\\t{transcript_id} format')
+
+    og_deg = subparsers.add_parser('og_deg',
+                                   help='compare orthogrouping and DEGs and return summary',
+                                   description='compare orthogrouping and DEGs and return summary')
+    og_deg.add_argument('-i', '--input',
+                        help='input orthogroups file (in orthotable format)',
+                        required=True)
+    og_deg.add_argument('-d', '--deg',
+                        help='input deg file(s). Filename should in {SPECIES}_{SAMPLE}.deg.tsv format',
+                        required=True,
+                        nargs='+')
+    og_deg.add_argument('-o', '--output',
+                        help='output prefix',
+                        required=True)
+    og_deg.add_argument('-a', '--annotation',
+                        help='input annotation file(s). Make sure to provide annotation for all the species involved',
+                        required=True,
+                        nargs='+')
+    og_deg.add_argument('-p', '--pvalue',
+                        help='pvalue cutoff',
+                        type=float,
+                        default=PVALUE_CUTOFF)
+    og_deg.add_argument('-l', '--lfc',
+                        help='log2 fold change cutoff',
+                        type=float,
+                        default=LFC_CUTOFF)
 
     args = parser.parse_args(args=None if sys.argv[1:] else ['--help'])
 
@@ -692,21 +909,37 @@ def main():
         orthogroups.write_og2tr_table(args.output)
         orthogroups.write_orthogroups_annotations(args.output)
     elif args.command == 'summary':
-        orthogroups = OrthogroupsParser(args.input, 'orthotable')
+        OrthogroupsParser(args.input, 'orthotable')
     elif args.command == 'compare':
         og_one = OrthogroupsParser(args.input[0], 'orthotable')
         og_two = OrthogroupsParser(args.input[1], 'orthotable')
         compare_orthogroups(og_one, og_two)
     elif args.command == 'annotate_deg':
         annotation_dict = defaultdict(AnnotationParser)
+        map_dict = defaultdict(GeneToTransMapParser)
         reference = strip_extension(strip_extension(os.path.basename(args.annotation)))
         annotation_dict[reference] = AnnotationParser(reference, os.path.realpath(args.annotation))
         if args.map is not None:
-            annotation_dict = isoforms_to_gene_ann(annotation_dict, args.map)
-
+            map_dict[reference] = GeneToTransMapParser(os.path.realpath(args.map))
+            annotation_dict[reference] = isoforms_to_gene_ann(annotation_dict[reference], map_dict[reference])
         deg = DEGParser(args.input, args.format, annotation_dict)
-
         deg.write_deg(args.output, args.lfc, args.pvalue)
+    elif args.command == 'og_deg':
+        if args.annotation is None:
+            orthogroups = OrthogroupsParser(args.input, 'orthotable')
+        else:
+            annotation_dict = defaultdict(AnnotationParser)
+            for annotation_file in args.annotation:
+                reference, ann_format = get_names(annotation_file, 'annotation')
+                if reference in annotation_dict:
+                    raise Exception(f"Duplicate reference name found: {reference}")
+                annotation_dict[reference] = AnnotationParser(reference, os.path.realpath(annotation_file))
+            orthogroups = OrthogroupsParser(args.input, 'orthotable', None, annotation_dict)
+        deg_dict = defaultdict(lambda: defaultdict(DEGParser))
+        for deg_file in args.deg:
+            reference, sample, deg_method = get_names(deg_file, 'deg')
+            deg_dict[reference][sample] = DEGParser(deg_file, deg_method, annotation_dict, args.lfc, args.pvalue)
+        orthogroups.summarize_DEGs(args.output, deg_dict, args.pvalue, args.lfc)
     else:
         parser.print_help()
         sys.exit(1)
@@ -714,27 +947,57 @@ def main():
     print_log(f"Total time taken: {datetime.now() - start_time}")
 
 
-def isoforms_to_gene_ann(annotation_dict, mapfile):
-    map_dict = defaultdict(GeneToTransMapParser)
-    reference = strip_extension(strip_extension(os.path.basename(mapfile)))
-    map_dict[reference] = GeneToTransMapParser(os.path.realpath(mapfile))
+def get_names(ifile, itype):
+    """
+    get reference and sample names from the input file name
+    """
+    if itype == 'fasta':
+        # check if the fasta name is in {reference}.fasta format or {reference}.fa format or {reference}.fna format or {reference}.faa format
+        if re.match(r'^.+\.fasta$', os.path.basename(ifile)):
+            return os.path.basename(ifile).split('.')[0]
+        elif re.match(r'^.+\.fa$', os.path.basename(ifile)):
+            return os.path.basename(ifile).split('.')[0]
+        elif re.match(r'^.+\.fna$', os.path.basename(ifile)):
+            return os.path.basename(ifile).split('.')[0]
+        elif re.match(r'^.+\.faa$', os.path.basename(ifile)):
+            return os.path.basename(ifile).split('.')[0]
+        else:
+            print_log(f"ERROR: Input fasta file name should be in {{reference}}.fasta format")
+            sys.exit(1)
+    elif itype == 'annotation':
+        # check if the annotation name is in {reference}.emapper.annotations format
+        if re.match(r'^.+\.emapper\.annotations$', os.path.basename(ifile)):
+            return [os.path.basename(ifile).split('.')[0], 'emapper']
+        else:
+            print_log(f"ERROR: Input annotation file name should be in {{reference}}.emapper.annotations format")
+            sys.exit(1)
+    elif itype == 'deg':
+        # check if the deg name is in {reference}_{sample}.{deg_method}.deg.tsv format
+        if re.match(r'^.+_.+\.(edgeR|deseq2)\.deg\.tsv$', os.path.basename(ifile)):
+            reference, sample = os.path.basename(ifile).split('.')[0].split('_')
+            deg_method = os.path.basename(ifile).split('.')[1]
+            return [reference, sample, deg_method]
+        else:
+            print_log(f"ERROR: Input deg file name should be in {{reference}}_{{sample}}.{{dge_method}}.deg.tsv format")
+            sys.exit(1)
+    else:
+        print_log(f"ERROR: Unknown input type: {itype}")
+        sys.exit(1)
+
+
+def isoforms_to_gene_ann(annotation_dict, map_dict):
+    """
+    change annotations from isofrom to gene, combine the isoforms annotation to gene annotation
+    """
     # change annotations from isofrom to gene, combine the isoforms annotation to gene annotation
-    for reference in annotation_dict:
-        for gene_id in annotation_dict[reference].annotations:
-            if gene_id in map_dict[reference].map:
-                gene = map_dict[reference].map[gene_id].gene
-                if gene in annotation_dict[reference].annotations:
-                    annotation_dict[reference].annotations[gene] = combine_annotations(gene,
-                                                                                       [annotation_dict[
-                                                                                            reference].annotations[
-                                                                                            gene],
-                                                                                        annotation_dict[
-                                                                                            reference].annotations[
-                                                                                            gene_id]])
-                else:
-                    annotation_dict[reference].annotations[gene] = annotation_dict[reference].annotations[
-                        gene_id]
-                del annotation_dict[reference].annotations[gene_id]
+    for gene_id in map_dict.map:
+        print(gene_id)
+        for attr_id in map_dict.get_attrs(gene_id):
+            ann_list = []
+            if attr_id not in annotation_dict.annotations:
+                continue
+            ann_list.append(annotation_dict.annotations[attr_id])
+        annotation_dict.annotations[gene_id] = combine_annotations(gene_id, ann_list)
     return annotation_dict
 
 
