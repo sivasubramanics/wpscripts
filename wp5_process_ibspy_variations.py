@@ -8,6 +8,16 @@ from collections import defaultdict, Counter
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+from transposecsv import Transpose
+from bigcsv import BigCSV
+
+
+def print_log(message):
+    """
+    Print log message
+    """
+    print(f'[{time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())}] {message}')
+    sys.stdout.flush()
 
 
 class Data:
@@ -17,7 +27,7 @@ class Data:
         self.di = di
         self.tot = tot
         self.ibs = ibs
-    
+
     @property
     def score(self):
         if self.tot == 0:
@@ -28,7 +38,7 @@ class Data:
         if _score < 0.001:
             return 0.00
         return _score
-    
+
     def __str__(self):
         return f'{self.ibs}:{self.va}:{self.ob}:{self.di}:{self.score}'
 
@@ -44,7 +54,7 @@ class Window:
 
     def set_total_kmers(self, total_kmers):
         self.total_kmers = total_kmers
-    
+
     def add_total_kmers(self, total_kmers):
         self.total_kmers += total_kmers
 
@@ -53,7 +63,7 @@ class Window:
             sample_names = [sample_names]
         for sample_name in sample_names:
             if sample_name not in self.data:
-                self.data[sample_name] = Data(0,0,0,self.total_kmers)
+                self.data[sample_name] = Data(0, 0, 0, self.total_kmers)
             if attribute == 'VA':
                 self.data[sample_name].va = value
             elif attribute == 'OB':
@@ -63,12 +73,12 @@ class Window:
 
     def set_data(self, sample_name, data):
         if sample_name not in self.data:
-            self.data[sample_name] = Data('N',0,0,0,self.total_kmers)
+            self.data[sample_name] = Data('N', 0, 0, 0, self.total_kmers)
         self.data[sample_name] = data
 
     def add_data(self, sample_name, data):
         if sample_name not in self.data:
-            self.data[sample_name] = Data('N',0,0,0,0)
+            self.data[sample_name] = Data('N', 0, 0, 0, 0)
         self.data[sample_name].tot += data.tot
         self.data[sample_name].ob += data.ob
         self.data[sample_name].va += data.va
@@ -94,7 +104,7 @@ class Window:
             else:
                 sys.exit(f'Error: Attribute {attribute} is not valid')
         return values
-    
+
     def get_window(self, sample_names=None):
         if sample_names is None:
             sample_names = self.data.keys()
@@ -116,14 +126,14 @@ class Window:
         di = self.get_value('DI', sample_names)
         return (f"MIN_SCORE={min(scores)};"
                 f"MAX_SCORE={max(scores)};"
-                f"MEAN_SCORE={round(sum(scores)/len(scores), 2)};"
+                f"MEAN_SCORE={round(sum(scores) / len(scores), 2)};"
                 f"MIN_VA={min(va)};"
                 f"MAX_VA={max(va)};"
-                f"MEAN_VA={round(sum(va)/len(va), 2)};"
+                f"MEAN_VA={round(sum(va) / len(va), 2)};"
                 f"MIN_OB={min(ob)};"
                 f"MAX_OB={max(ob)};"
-                f"MEAN_OB={round(sum(ob)/len(ob), 2)};")
-    
+                f"MEAN_OB={round(sum(ob) / len(ob), 2)};")
+
     def __str__(self):
         return f'{self.chr_name}\t{self.start}\t{self.end}'
 
@@ -142,6 +152,7 @@ def read_tsv(input_file, sample_name=None):
     if sample_name is None:
         sample_name = os.path.basename(input_file).split('.')[0]
     line_count = 0
+    print_log(f'Reading {input_file}')
     with open(input_file, 'r') as f:
         for line in f:
             line_count += 1
@@ -155,7 +166,7 @@ def read_tsv(input_file, sample_name=None):
             window.set_total_kmers(int(line[3]))
             window.set_data(sample_name, Data('N', int(line[4]), int(line[5]), int(line[6]), int(line[3])))
             yield window
-    
+
 
 def tsv2kcf(input_file, output_file, sample_name=None):
     """
@@ -175,12 +186,12 @@ def read_kcf(input_file, windows=None, samples_list=None):
     Read kcf file and return a Window object
     """
     if windows is None:
-        windows = defaultdict()
+        windows = defaultdict(Window)
     if samples_list is None:
         samples_list = []
     line_count = 0
     misc_lines = []
-    print(f'Reading {input_file}')
+    print_log(f'Reading {input_file}')
     with open(input_file, 'r') as f:
         for line in f:
             if line.startswith('##'):
@@ -192,7 +203,8 @@ def read_kcf(input_file, windows=None, samples_list=None):
                     samples = line.strip().split('\t')[6:]
                     if duplicates(samples):
                         sys.exit(f'Error: {input_file} contains duplicate samples')
-                    samples_list.extend(samples)
+                    # samples_list.extend(samples)
+                    samples_list += samples
                     if duplicates(samples_list):
                         sys.exit(f'Error: {input_file} contains samples that are already present in other input files')
                     continue
@@ -205,7 +217,7 @@ def read_kcf(input_file, windows=None, samples_list=None):
                 windows[key] = window
             windows[key].set_total_kmers(int(line[3]))
             for i, sample in enumerate(samples):
-                ib,va,ob,di,sc = line[6+i].split(':')
+                ib, va, ob, di, sc = line[6 + i].split(':')
                 if ib != 'N':
                     ib = int(ib)
                 windows[key].set_data(sample, Data(ib, int(ob), int(va), int(di), int(line[3])))
@@ -232,20 +244,20 @@ def increase_window(input_file, output_file, window_size, kmer_size, length_file
     windows, samples, misc_lines = read_kcf(input_file)
     seq_lengths = get_seq_lengths(length_file)
     current_window_size = get_current_window_size(windows, seq_lengths)
-    print(f'Current window size: {current_window_size}')
+    print_log(f'Current window size: {current_window_size}')
     windows = convert_windows(windows, seq_lengths, current_window_size, int(window_size), int(kmer_size))
-    print(f'New window size: {window_size}')
+    print_log(f'New window size: {window_size}')
     write_kcf(output_file, windows, samples, misc_lines)
 
 
-def write_kcf(output_file, windows, samples, misc_lines=None):
+def write_kcf(out_kcf, windows, samples, misc_lines=None):
     """
     Write kcf file
     """
     if type(samples) == str:
         samples = [samples]
-    print(f'Writing {output_file}')
-    with open(output_file, 'w') as o:
+    print_log(f'Writing {out_kcf}')
+    with open(out_kcf, 'w') as o:
         samples_line = '\t'.join(samples)
         if misc_lines:
             for misc_line in misc_lines:
@@ -253,7 +265,7 @@ def write_kcf(output_file, windows, samples, misc_lines=None):
         else:
             o.write(f'##fileformat=KCFv1.0 (Kmer CountTable Farmat)\n')
             o.write(f'##source=IBSpy\n')
-            o.write(f'##TOTAL_KMER=Total numeber of Kmers counted within the window\n')
+            o.write(f'##TOTAL_KMER=Total number of Kmers counted within the window\n')
             o.write(f'##VA=Number of Variations\n')
             o.write(f'##OB=Observed k-mers\n')
             o.write(f'##DI=K-mer distance\n')
@@ -262,32 +274,36 @@ def write_kcf(output_file, windows, samples, misc_lines=None):
         o.write(f'#CHROM\tSTART\tEND\tTOTAL_KMER\tINFO\tFORMAT\t{samples_line}\n')
         for window_key in windows:
             window = windows[window_key]
-            o.write(f'{window}\t{windows[window_key].total_kmers}\t{windows[window_key].get_info()}\tIB:VA:OB:DI:SC\t{windows[window_key].get_window()}\n')
+            o.write(f'{window}'
+                    f'\t{windows[window_key].total_kmers}'
+                    f'\t{windows[window_key].get_info()}'
+                    f'\tIB:VA:OB:DI:SC'
+                    f'\t{windows[window_key].get_window()}\n')
 
 
-def get_current_window_size(windows, chr_lenths):
+def get_current_window_size(windows, chr_lengths):
     """
     Get current window size
     """
     window_size = 0
     for (seqname, start, end) in windows:
         if window_size == 0:
-            window_size = end-start
-        if end == chr_lenths[seqname]:
+            window_size = end - start
+        if end == chr_lengths[seqname]:
             continue
-        if window_size != end-start:
+        if window_size != end - start:
             sys.exit(f'Error: Window size is not consistent in input file.')
     return int(window_size)
 
 
-def convert_windows(windows, chr_lenths, o_win_size, n_win_size, kmer_size):
+def convert_windows(windows, chr_lengths, o_win_size, n_win_size, kmer_size):
     """
     Convert window size
     """
     new_windows = defaultdict(dict)
-    for seqname in chr_lenths:
+    for seqname in chr_lengths:
         n_win_start = 0
-        win_starts, win_ends = get_window(0, chr_lenths[seqname], n_win_size, kmer_size)
+        win_starts, win_ends = get_window(0, chr_lengths[seqname], n_win_size, kmer_size)
         for win_start, win_end in zip(win_starts, win_ends):
             new_window = Window(seqname, win_start, win_end)
             new_key = (str(seqname), str(win_start), str(win_end))
@@ -342,7 +358,7 @@ def find_IBS(input_file, output_file, min_variations, min_score, min_consecutive
     Flag the IBS regions in kcf file
     """
     windows, samples, misc_lines = read_kcf(input_file)
-    print(f'Finding IBS regions in {input_file}')
+    print_log(f'Finding IBS regions in {input_file}')
     for sample in samples:
         block_num = 0
         na_num = 0
@@ -380,7 +396,7 @@ def extract(input_file, output_prefix, sample_name=None):
     Extract windows from kcf file
     """
     windows, samples, misc_lines = read_kcf(input_file)
-    print(f'Extracting windows from {input_file}')
+    print_log(f'Extracting windows from {input_file}')
     if sample_name is not None:
         if type(sample_name) == str:
             samples = [sample_name]
@@ -406,7 +422,8 @@ def extract(input_file, output_prefix, sample_name=None):
                 continue
             if block_num != last_block_num:
                 if block_start is not None:
-                    fo.write(f'{seqname}\t{block_start}\t{block_end}\t{block_end-block_start}\t{all_num-na_num-1}\t{block_count}\n')
+                    fo.write(
+                        f'{seqname}\t{block_start}\t{block_end}\t{block_end - block_start}\t{all_num - na_num - 1}\t{block_count}\n')
                     fo_bed.write(f'{seqname}\t{block_start}\t{block_end}\t0\t+\n')
                 block_count = 0
                 block_start = start
@@ -415,7 +432,8 @@ def extract(input_file, output_prefix, sample_name=None):
             last_block_num = block_num
             block_end = end
             block_count += 1
-        fo.write(f'{seqname}\t{block_start}\t{block_end}\t{block_end-block_start}\t{all_num-na_num}\t{block_count}\n')
+        fo.write(
+            f'{seqname}\t{block_start}\t{block_end}\t{block_end - block_start}\t{all_num - na_num}\t{block_count}\n')
         fo_bed.write(f'{seqname}\t{block_start}\t{block_end}\t0\t+\n')
         fo.close()
 
@@ -441,7 +459,7 @@ def kcf2bedgraph(input_file, output_prefix, sample_name=None):
     """
     Convert kcf file to bedgraph files
     """
-    windows, samples, misc_lines = read_kcf(input_file)    
+    windows, samples, misc_lines = read_kcf(input_file)
     if sample_name is not None:
         if type(sample_name) == str:
             samples = [sample_name]
@@ -456,6 +474,7 @@ def write_bedgraph(windows, samples, output_prefix):
     """
     for sample in samples:
         output_file = f'{output_prefix}.{sample}.bedgraph'
+        print_log(f'Writing {output_file}')
         fo = open(output_file, 'w')
         # fo.write(f'track type=bedGraph name="{sample}" description="{sample}" visibility=full color=200,100,0 altColor=0,100,200 priority=20\n')
         prev_chrom = None
@@ -474,13 +493,16 @@ def write_bedgraph(windows, samples, output_prefix):
 
 
 def ibs_to_binary(in_str):
+    """
+    Convert IBS to binary
+    """
     if in_str == 'N':
         return '0'
     else:
         return '1'
 
 
-def write_matrix(windows, samples, output):
+def write_matrix(windows, output, samples=None):
     """
     Write genotype matrix
     if the score is more than 0.8 make it 1,
@@ -489,9 +511,11 @@ def write_matrix(windows, samples, output):
     if the score is NA make it NA
     the output genotype matrix should have only the samples on the columns and window as rows
     """
-    with open(output + '.matrix.tsv', 'w') as o:
-        o.write('window\t' + '\t'.join(samples) + '\n')
-        for key in windows:
+    print_log(f'Writing {output}.matrix.tr.tsv')
+    with open(output + '.matrix.tr.tsv', 'w') as f_matrix, open(output + '.map.tsv', 'w') as f_map:
+        f_matrix.write('taxa\t' + '\t'.join(samples) + '\n')
+        f_map.write('name\tchromosome\tposition\n')
+        for i, key in enumerate(windows):
             window = windows[key]
             scores = window.get_value('SC', samples)
             genotypes = []
@@ -504,31 +528,49 @@ def write_matrix(windows, samples, output):
                     genotypes.append('0.5')
                 else:
                     genotypes.append('NA')
-            o.write(f'{window}\t' + '\t'.join(genotypes) + '\n')
-    with open(output + '.map.tsv', 'w') as o:
-        o.write('window\tchromosome\tposition\n')
-        for key in windows:
-            window = windows[key]
-            o.write(f'{window}\t{window.chr_name}\t{window.start}\n')
+            f_matrix.write(f'{i + 1}\t' + '\t'.join(genotypes) + '\n')
+            f_map.write(f'{i+1}\t{key[0]}\t{key[1]}\n')
 
 
-def kcf2matrix(input, output, sample):
+def transpose_gt_matrix(input_file, output_file):
+    """
+    Transpose large tsv file
+    """
+    import csv
+    print_log(f'Transposing {input_file}')
+    # Get the total number of columns
+    with open(input_file, 'r') as f:
+        num_cols = len(f.readline().split('\t'))
+
+    # Open the output file
+    with open(output_file, 'w', newline='') as outfile:
+        writer = csv.writer(outfile, delimiter='\t')
+
+        for col_index in range(num_cols):
+            with open(input_file, 'r') as infile:
+                reader = csv.reader(infile, delimiter='\t')
+                column = [row[col_index] for row in reader]
+
+            # Write the column as a row in the output file
+            writer.writerow(column)
+
+def kcf2matrix(ikcf, outprefix, sample):
     """
     Convert kcf file to genotype matrix and genotype map file.
     the map file will have the window name, chromosome and the position in TSV format
     """
-    windows, samples, misc_lines = read_kcf(input)
+    windows, samples, misc_lines = read_kcf(ikcf)
     if sample is not None:
         if type(sample) == str:
             samples = [sample]
         elif type(sample) == list:
             samples = sample
-    write_matrix(windows, samples, output)
-
+    write_matrix(windows, outprefix, samples)
+    transpose_gt_matrix(f"{outprefix}.matrix.tr.tsv", f"{outprefix}.matrix.tsv")
 
 
 def main():
-    # start clock
+    # start the clock
     start_time = time.time()
 
     parser = argparse.ArgumentParser()
@@ -538,7 +580,8 @@ def main():
     parser_tsv2vcf = subparsers.add_parser('tsv2kcf', help='Step 1: Convert IBSpy tsv to kcf')
     parser_tsv2vcf.add_argument('-i', '--input', help='Input IBSpy tsv file', required=True)
     parser_tsv2vcf.add_argument('-o', '--output', help='Output kcf file', required=True)
-    parser_tsv2vcf.add_argument('-s', '--sample', help='Sample name (if not given, will be taken from input file name)')
+    parser_tsv2vcf.add_argument('-s', '--sample',
+                                help='Sample name (if not given, will be taken from input file name)')
 
     # Create the parser for the "cohort" command
     parser_combine = subparsers.add_parser('cohort', help='Step 2.a: Combine kcf files')
@@ -549,9 +592,11 @@ def main():
     parser_increase_window = subparsers.add_parser('increase_window', help='Step 2.b: Increase window size')
     parser_increase_window.add_argument('-i', '--input', help='Input kcf file', required=True)
     parser_increase_window.add_argument('-o', '--output', help='Output kcf file', required=True)
-    parser_increase_window.add_argument('-l', '--length', help='Sequence length file. Preferrably .fai', required=True)
+    parser_increase_window.add_argument('-l', '--length',
+                                        help='Sequence length file. Preferrably .fai', required=True)
     parser_increase_window.add_argument('-w', '--window', help='Window size', required=True)
-    parser_increase_window.add_argument('-k', '--kmer', help='Kmer size used during the IBSpy pipeline', required=True)
+    parser_increase_window.add_argument('-k', '--kmer',
+                                        help='Kmer size used during the IBSpy pipeline', required=True)
 
     # Create the parser for the "find_IBS" command
     parser_find_IBS = subparsers.add_parser('find_IBS', help='Step 3: Find the IBS regions in kcf file')
@@ -559,28 +604,31 @@ def main():
     parser_find_IBS.add_argument('-o', '--output', help='Output kcf file', required=True)
     parser_find_IBS.add_argument('-v', '--variations', help='Minimum variations cut-off', default=6, type=float)
     parser_find_IBS.add_argument('-s', '--score', help='Minimum score cut-off', default=0.8, type=float)
-    parser_find_IBS.add_argument('-c', '--consecutive', help='Minimum consecutive windows with NA\'s', default=5, type=int)
+    parser_find_IBS.add_argument('-c', '--consecutive',
+                                 help='Minimum consecutive windows with NA\'s', default=5, type=int)
 
     # Create the parser for the "extract" command
     parser_extract = subparsers.add_parser('extract', help='Step 4: Extract windows from kcf file')
     parser_extract.add_argument('-i', '--input', help='Input kcf file', required=True)
     parser_extract.add_argument('-o', '--output', help='Output prefix', required=True)
-    parser_extract.add_argument('-s', '--sample', help='Sample name (if not given, will be taken from input file name)')
+    parser_extract.add_argument('-s', '--sample',
+                                help='Sample name (if not given, will be taken from input file name)')
 
     # Create the parser for the "bedgraph" command
     parser_bedgraph = subparsers.add_parser('kcf2bedgraph', help='Step 5: Convert kcf file to bedgraph files')
     parser_bedgraph.add_argument('-i', '--input', help='Input kcf file', required=True)
     parser_bedgraph.add_argument('-o', '--output', help='Output prefix', required=True)
-    parser_bedgraph.add_argument('-s', '--sample', help='Sample name (if not given, will be taken from input file name)')
+    parser_bedgraph.add_argument('-s', '--sample',
+                                 help='Sample name (if not given, will be taken from input file name)')
 
     parser_kcf2matrix = subparsers.add_parser('kcf2matrix', help='Step 6: Convert kcf file to genotype matrix')
     parser_kcf2matrix.add_argument('-i', '--input', help='Input kcf file', required=True)
     parser_kcf2matrix.add_argument('-o', '--output', help='Output prefix', required=True)
-    parser_kcf2matrix.add_argument('-s', '--sample', help='Sample name (if not given, will be taken from input file name)')
-
+    parser_kcf2matrix.add_argument('-s', '--sample',
+                                   help='Sample name (if not given, will be taken from input file name)')
 
     args = parser.parse_args(args=(sys.argv[1:] or ['--help']))
-    
+
     if args.command == 'tsv2kcf':
         tsv2kcf(args.input, args.output, args.sample)
     elif args.command == 'cohort':
@@ -606,5 +654,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
