@@ -5,12 +5,10 @@ import sys
 import argparse
 import time
 from collections import defaultdict, Counter
-import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
-from transposecsv import Transpose
-from bigcsv import BigCSV
-
+# import pandas as pd
+# import seaborn as sns
+# import matplotlib.pyplot as plt
+import csv
 
 def print_log(message):
     """
@@ -536,7 +534,6 @@ def transpose_gt_matrix(input_file, output_file):
     """
     Transpose large tsv file
     """
-    import csv
     print_log(f'Transposing {input_file}')
     # Get the total number of columns
     with open(input_file, 'r') as f:
