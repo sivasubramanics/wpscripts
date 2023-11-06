@@ -10,6 +10,13 @@ from collections import defaultdict, Counter
 # import matplotlib.pyplot as plt
 import csv
 
+
+NEWLINE = '\n'
+TAB = '\t'
+COMMA = ','
+COLON = ':'
+SEMICOLON = ';'
+
 def print_log(message):
     """
     Print log message
@@ -566,6 +573,87 @@ def kcf2matrix(ikcf, outprefix, sample):
     transpose_gt_matrix(f"{outprefix}.matrix.tr.tsv", f"{outprefix}.matrix.tsv")
 
 
+def list_to_str(in_list, sep='\t'):
+    """
+    Convert list to string
+    """
+    return sep.join(map(str, in_list))
+
+
+def split_kcf(in_kcf, out_prefix, samples=None, chrs=None):
+    """
+    Split kcf file by chromosome for given set of samples if list of samples provided
+    """
+    prev_chrom = None
+    data_indices = [0, 1, 2, 3, 4, 5]
+    misc_lines = []
+    with open(in_kcf, 'r') as f:
+        for line in f:
+            if line.startswith('##'):
+                misc_lines.append(line.strip())
+                continue
+            if line.startswith('#CHROM'):
+                misc_lines.append(f"##CMD: {' '.join(sys.argv)}")
+                in_samples = line.strip().split('\t')[6:]
+                if samples is None:
+                    samples = in_samples
+                if type(samples) == str:
+                    samples = [samples]
+                for sample in samples:
+                    data_indices.append(in_samples.index(sample)+6)
+                    if sample not in in_samples:
+                        sys.exit(f'Error: {sample} not found in {in_kcf}')
+                misc_lines.append(f'#CHROM\tSTART\tEND\tTOTAL_KMER\tINFO\tFORMAT\t{list_to_str(samples)}')
+                continue
+            else:
+                line = line.strip().split('\t')
+                out_line = [line[i] for i in data_indices]
+                if chrs is not None:
+                    if line[0] not in chrs:
+                        continue
+                if prev_chrom is None or line[0] != prev_chrom:
+                    print_log(f'Writing {out_prefix}.{line[0]}.kcf')
+                    fo = open(f'{out_prefix}.{line[0]}.kcf', 'w')
+                    fo.write(f'{list_to_str(misc_lines, NEWLINE)}\n')
+                fo.write(f'{list_to_str(out_line)}\n')
+                prev_chrom = line[0]
+
+
+def concat(in_kcfs, out_kcf):
+    """
+    Concatenate list of kcf files from different chromosomes to a single kcf file
+    """
+    fo = open(out_kcf, 'w')
+    misc_lines = []
+    first_file = True
+    for in_kcf in in_kcfs:
+        print_log(f'Reading {in_kcf}')
+        f = open(in_kcf, 'r')
+        for line in f:
+            line = line.strip()
+            if line.startswith('##'):
+                misc_lines.append(line)
+                continue
+            if line.startswith('#CHROM'):
+                if first_file:
+                    samples = line.strip().split('\t')[6:]
+                    misc_lines.append(f'#CHROM\tSTART\tEND\tTOTAL_KMER\tINFO\tFORMAT\t{list_to_str(samples)}')
+                    first_file = False
+                else:
+                    current_samples = line.strip().split('\t')[6:]
+                    if samples != current_samples:
+                        os.remove(out_kcf)
+                        print_log(f'Error: {in_kcf} contains different samples than previous files')
+                        sys.exit(1)
+                fo.write(f'{list_to_str(misc_lines, NEWLINE)}\n')
+                continue
+            fo.write(f'{line}\n')
+        f.close()
+    fo.close()
+
+
+
+
 def main():
     # start the clock
     start_time = time.time()
@@ -618,11 +706,25 @@ def main():
     parser_bedgraph.add_argument('-s', '--sample',
                                  help='Sample name (if not given, will be taken from input file name)')
 
+    # Create the parser for the "matrix" command
     parser_kcf2matrix = subparsers.add_parser('kcf2matrix', help='Step 6: Convert kcf file to genotype matrix')
     parser_kcf2matrix.add_argument('-i', '--input', help='Input kcf file', required=True)
     parser_kcf2matrix.add_argument('-o', '--output', help='Output prefix', required=True)
     parser_kcf2matrix.add_argument('-s', '--sample',
                                    help='Sample name (if not given, will be taken from input file name)')
+
+    # Create the parser for the "split_kcf" command
+    parser_split_kcf = subparsers.add_parser('split_kcf', help='Misc: Split kcf file by chromosome')
+    parser_split_kcf.add_argument('-i', '--input', help='Input kcf file', required=True)
+    parser_split_kcf.add_argument('-o', '--output', help='Output prefix', required=True)
+    parser_split_kcf.add_argument('-s', '--sample',
+                                  help='Sample name (if not given, will be taken from input file name)')
+    parser_split_kcf.add_argument('-c', '--chrs', help='Chromosomes to be extracted', nargs='+')
+
+    # Create the parser for the "concat" command
+    parser_concat = subparsers.add_parser('concat', help='Misc: Concatenate kcf files (samples should be identical)')
+    parser_concat.add_argument('-i', '--input', help='Input kcf files', nargs='+', required=True)
+    parser_concat.add_argument('-o', '--output', help='Output kcf file', required=True)
 
     args = parser.parse_args(args=(sys.argv[1:] or ['--help']))
 
@@ -640,6 +742,10 @@ def main():
         kcf2bedgraph(args.input, args.output, args.sample)
     elif args.command == 'kcf2matrix':
         kcf2matrix(args.input, args.output, args.sample)
+    elif args.command == 'split_kcf':
+        split_kcf(args.input, args.output, args.sample, args.chrs)
+    elif args.command == 'concat':
+        concat(args.input, args.output)
     else:
         parser.print_help()
         sys.exit(1)
