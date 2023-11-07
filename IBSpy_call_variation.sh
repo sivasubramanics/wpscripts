@@ -1,19 +1,26 @@
 #!/bin/bash
+# script to call variations using IBSpy
+# contact: siva.selvanayagam[at]wur.nl
+# version: 0.1
+# date: 02-08-2023
 
 set -u
 set -e
 
 start=$(date +%s)
 
+# functin to print log messages
 print_log(){
     echo "[`date +'%Y-%m-%d %H:%M:%S'`] $1"
 }
 
+# function to run commands
 run_cmd(){
     echo "[`date +'%Y-%m-%d %H:%M:%S'`] CMD: $1"
     eval $1
 }
 
+# function to convert seconds to hh:mm:ss format
 seconds_to_hhmmss(){
     local seconds=$1
     local hours=$(printf "%02d" $((seconds / 3600)))
@@ -22,6 +29,7 @@ seconds_to_hhmmss(){
     echo "$hours:$minutes:$seconds"
 }
 
+# function to print usage
 usage(){
     echo "Usage: $0 [-h] [-f fq.list] [-F fq_list] [-r ref.fa] [-o output] [-p threads] [-k kmer_size] [-w window_size]"
     echo "Options:"
@@ -36,6 +44,7 @@ usage(){
     exit 1
 }
 
+# function to check if a command exists
 check_exec(){
     if ! command -v $1 &> /dev/null; then
         echo "Error: $1 is not installed"
@@ -43,6 +52,7 @@ check_exec(){
     fi
 }
 
+# parse arguments
 while getopts "f:F:r:o:p:k:w:h" opt; do
     case $opt in
         f) input=$OPTARG;;
@@ -57,10 +67,12 @@ while getopts "f:F:r:o:p:k:w:h" opt; do
     esac
 done
 
+# check arguments and input files
 if [ $# -eq 0 ] || [ -z "$input" ] || [ -z "$format" ] || [ -z "$ref" ] || [ -z "$output" ] || [ -z "$threads" ] || [ -z "$kmer_size" ] || [ -z "$window_size" ]; then
     usage
 fi
 
+# check if input files exist
 if [ "$format" == "fq" ]; then
     in_cmd="-fq $input"
 elif [ "$format" == "fq_list" ]; then
@@ -74,10 +86,12 @@ else
     exit 1
 fi
 
+# check if the kmersGWAS tools are installed
 print_log "Checking tools"
 check_exec kmc 
 check_exec $TOOLS_PATH/kmersGWAS/bin/kmers_add_strand_information
 
+# pipeline begins here
 print_log "Creating output directory $output"
 mkdir -p $output
 

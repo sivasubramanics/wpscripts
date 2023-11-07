@@ -279,7 +279,7 @@ def write_kcf(out_kcf, windows, samples, misc_lines=None):
             for misc_line in misc_lines:
                 o.write(f'{misc_line}\n')
         else:
-            o.write(f'##fileformat=KCFv1.0 (Kmer CountTable Farmat)\n')
+            o.write(f'##fileformat=KCFv1.0 (Kmer CountTable Format)\n')
             o.write(f'##source=IBSpy\n')
             o.write(f'##TOTAL_KMER=Total number of Kmers counted within the window\n')
             o.write(f'##VA=Number of Variations\n')
@@ -539,16 +539,22 @@ def write_matrix(windows, output, samples=None):
         for i, key in enumerate(windows):
             window = windows[key]
             scores = window.get_value('SC', samples)
+            observed = window.get_value('OB', samples)
             genotypes = []
-            for score in scores:
-                if score >= 0.80:
-                    genotypes.append('1')
+            for i, score in enumerate(scores):
+                if score == 0.00:
+                    if observed[i] == 0:
+                        genotypes.append('N')
+                    else:
+                        genotypes.append('0')
+                elif score >= 0.80:
+                    genotypes.append('2')
                 elif score <= 0.30:
                     genotypes.append('0')
                 elif 0.30 < score < 0.80:
-                    genotypes.append('0.5')
+                    genotypes.append('1')
                 else:
-                    genotypes.append('NA')
+                    genotypes.append('N')
             f_matrix.write(f'{i + 1}\t' + '\t'.join(genotypes) + '\n')
             f_map.write(f'{i+1}\t{key[0]}\t{key[1]}\n')
 
