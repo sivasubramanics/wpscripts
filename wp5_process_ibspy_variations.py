@@ -541,9 +541,9 @@ def write_matrix(windows, output, samples=None):
             scores = window.get_value('SC', samples)
             observed = window.get_value('OB', samples)
             genotypes = []
-            for i, score in enumerate(scores):
+            for j, score in enumerate(scores):
                 if score == 0.00:
-                    if observed[i] == 0:
+                    if observed[j] == 0:
                         genotypes.append('N')
                     else:
                         genotypes.append('0')
