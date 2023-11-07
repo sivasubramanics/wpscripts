@@ -5,7 +5,7 @@ import sys
 import argparse
 import time
 from collections import defaultdict, Counter
-# import pandas as pd
+import pandas as pd
 # import seaborn as sns
 # import matplotlib.pyplot as plt
 import csv
@@ -580,6 +580,15 @@ def transpose_gt_matrix(input_file, output_file):
             # Write the column as a row in the output file
             writer.writerow(column)
 
+def transpose_matrix(in_file, out_file):
+    """
+    Transpose matrix
+    """
+    print_log(f'Transposing {in_file}')
+    df = pd.read_csv(in_file, sep='\t')
+    df = df.T
+    df.to_csv(out_file, sep='\t', header=False)
+
 def kcf2matrix(ikcf, outprefix, sample):
     """
     Convert kcf file to genotype matrix and genotype map file.
@@ -592,7 +601,8 @@ def kcf2matrix(ikcf, outprefix, sample):
         elif type(sample) == list:
             samples = sample
     write_matrix(windows, outprefix, samples)
-    transpose_gt_matrix(f"{outprefix}.matrix.tr.tsv", f"{outprefix}.matrix.tsv")
+    # transpose_gt_matrix(f"{outprefix}.matrix.tr.tsv", f"{outprefix}.matrix.tsv")
+    transpose_matrix(f"{outprefix}.matrix.tr.tsv", f"{outprefix}.matrix.tsv")
 
 
 def list_to_str(in_list, sep='\t'):
