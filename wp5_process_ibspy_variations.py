@@ -186,6 +186,17 @@ def tsv2kcf(input_file, output_file, sample_name=None):
     write_kcf(output_file, windows, sample_name)
 
 
+def get_chromosomes(windows):
+    """
+    Return a list of chromosomes in the windows
+    """
+    chromosomes = []
+    for window in windows:
+        if window.chr_name not in chromosomes:
+            chromosomes.append(window.chr_name)
+    return chromosomes
+
+
 def read_kcf(input_file, windows=None, samples_list=None):
     """
     Read kcf file and return a Window object
@@ -305,8 +316,13 @@ def convert_windows(windows, chr_lengths, o_win_size, n_win_size, kmer_size):
     """
     Convert window size
     """
+    # get all the chromosomes from the windows dictionary
+    chromosomes = get_chromosomes(windows)
     new_windows = defaultdict(dict)
     for seqname in chr_lengths:
+        # check if the chromosome is in the fai file
+        if seqname not in chromosomes:
+            continue
         n_win_start = 0
         win_starts, win_ends = get_window(0, chr_lengths[seqname], n_win_size, kmer_size)
         for win_start, win_end in zip(win_starts, win_ends):
