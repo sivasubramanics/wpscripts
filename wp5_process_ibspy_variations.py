@@ -661,13 +661,13 @@ def concat(in_kcfs, out_kcf):
                     samples = line.strip().split('\t')[6:]
                     misc_lines.append(f'#CHROM\tSTART\tEND\tTOTAL_KMER\tINFO\tFORMAT\t{list_to_str(samples)}')
                     first_file = False
+                    fo.write(f'{list_to_str(misc_lines, NEWLINE)}\n')
                 else:
                     current_samples = line.strip().split('\t')[6:]
                     if samples != current_samples:
                         os.remove(out_kcf)
                         print_log(f'Error: {in_kcf} contains different samples than previous files')
                         sys.exit(1)
-                fo.write(f'{list_to_str(misc_lines, NEWLINE)}\n')
                 continue
             fo.write(f'{line}\n')
         f.close()
