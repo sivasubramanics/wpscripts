@@ -192,8 +192,8 @@ def get_chromosomes(windows):
     """
     chromosomes = []
     for window in windows:
-        if window.chr_name not in chromosomes:
-            chromosomes.append(window.chr_name)
+        if window[0] not in chromosomes:
+            chromosomes.append(window[0])
     return chromosomes
 
 
