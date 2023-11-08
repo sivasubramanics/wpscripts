@@ -158,6 +158,10 @@ def read_tsv(input_file, sample_name=None):
         sample_name = os.path.basename(input_file).split('.')[0]
     line_count = 0
     print_log(f'Reading {input_file}')
+    # check if the tsv file is empty
+    if os.stat(input_file).st_size == 0:
+        print_log(f'ERROR: {input_file} is empty')
+        sys.exit(1)
     with open(input_file, 'r') as f:
         for line in f:
             line_count += 1
@@ -555,8 +559,9 @@ def write_matrix(windows, output, samples=None):
                     genotypes.append('1')
                 else:
                     genotypes.append('N')
-            f_matrix.write(f'{i + 1}\t' + '\t'.join(genotypes) + '\n')
-            f_map.write(f'{i+1}\t{key[0]}\t{key[1]}\n')
+            if 'N' not in genotypes:
+                f_matrix.write(f'{i + 1}\t' + '\t'.join(genotypes) + '\n')
+                f_map.write(f'{i+1}\t{key[0]}\t{key[1]}\n')
 
 
 def transpose_gt_matrix(input_file, output_file):
