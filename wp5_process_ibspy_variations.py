@@ -689,6 +689,35 @@ def concat(in_kcfs, out_kcf):
     fo.close()
 
 
+def extract_samples(input, output, samples):
+    """
+    Extract samples from kcf file
+    """
+    # TODO: fix this function for modifying the info fields as well
+    sample_indices = []
+    if type(samples) == str:
+        samples = [samples]
+    elif type(samples) == list:
+        samples = samples
+    fi = open(input, 'r')
+    fo = open(output, 'w')
+    for line in fi:
+        if line.startswith('##'):
+            fo.write(line)
+            continue
+        line = line.strip().split('\t')
+        if line[0].startswith('#CHROM'):
+            fo.write(f"##CMD: {' '.join(sys.argv)}\n")
+            for sample in samples:
+                if sample in line:
+                    sample_indices.append(line.index(sample))
+            fo.write(f'{list_to_str(line[:6])}\t{list_to_str(samples)}\n')
+            continue
+        fo.write(f'{list_to_str(line[:6])}\t{list_to_str([line[i] for i in sample_indices])}\n')
+    fi.close()
+    fo.close()
+
+
 
 
 def main():
@@ -763,6 +792,15 @@ def main():
     parser_concat.add_argument('-i', '--input', help='Input kcf files', nargs='+', required=True)
     parser_concat.add_argument('-o', '--output', help='Output kcf file', required=True)
 
+    # Parser for extract_samples command
+    parser_extract_samples = subparsers.add_parser('extract_samples', help='Misc: Extract samples from kcf file')
+    parser_extract_samples.add_argument('-i', '--input', help='Input kcf file (multi sampled)', required=True)
+    parser_extract_samples.add_argument('-o', '--output', help='Output kcf file', required=True)
+    parser_extract_samples.add_argument('-s', '--samples',
+                                        help='Samples to be extracted Names or list',
+                                        nargs='+', default=None)
+    parser_extract_samples.add_argument('-S', '--samples_list', help='File containing list of samples to be extracted', default=None)
+
     args = parser.parse_args(args=(sys.argv[1:] or ['--help']))
 
     if args.command == 'tsv2kcf':
@@ -783,6 +821,19 @@ def main():
         split_kcf(args.input, args.output, args.sample, args.chrs)
     elif args.command == 'concat':
         concat(args.input, args.output)
+    elif args.command == 'extract_samples':
+        if args.samples is None and args.samples_list is None:
+            print('Error: Either samples or samples_list should be provided')
+            sys.exit(1)
+        if args.samples is not None and args.samples_list is not None:
+            print('Error: Either samples or samples_list should be provided')
+            sys.exit(1)
+        if args.samples_list is not None:
+            with open(args.samples_list, 'r') as f:
+                samples = [line.strip() for line in f]
+        else:
+            samples = args.samples
+        extract_samples(args.input, args.output, samples)
     else:
         parser.print_help()
         sys.exit(1)

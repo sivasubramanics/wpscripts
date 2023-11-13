@@ -67,7 +67,7 @@ case $in_format in
                 ;;
             hmp)
                 check_tool run_pipeline.pl
-                run_cmd "run_pipeline.pl -fork1 -vcf $input -export $output -exportType Hapmap -runfork1 > convert_format.log 2>&1"
+                run_cmd "run_pipeline.pl -fork1 -vcf $input -sortPositions -export $output -exportType Hapmap -runfork1 > convert_format.log 2>&1"
                 ;;
             *)
                 print_log "Error: $out_format is not supported"
@@ -87,7 +87,7 @@ case $in_format in
                 ;;
             hmp)
                 check_tool run_pipeline.pl
-                run_cmd "run_pipeline.pl -fork1 -vcf $input -export $output -exportType Hapmap -runfork1 > convert_format.log 2>&1"
+                run_cmd "run_pipeline.pl -fork1 -vcf $input -sortPositions -export $output -exportType Hapmap -runfork1 > convert_format.log 2>&1"
                 ;;
             *)
                 print_log "Error: $out_format is not supported"
