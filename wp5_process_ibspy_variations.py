@@ -6,8 +6,9 @@ import argparse
 import time
 from collections import defaultdict, Counter
 import pandas as pd
+import numpy as np
 # import seaborn as sns
-# import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 import csv
 
 
@@ -527,7 +528,7 @@ def ibs_to_binary(in_str):
         return '1'
 
 
-def write_matrix(windows, output, samples=None):
+def write_matrix(windows, output, samples=None, allele_a_cutoff=0.8, allele_b_cutoff=0.3):
     """
     Write genotype matrix
     if the score is more than 0.8 make it 1,
@@ -551,12 +552,12 @@ def write_matrix(windows, output, samples=None):
                         genotypes.append('N')
                     else:
                         genotypes.append('0')
-                elif score >= 0.80:
+                elif score >= allele_a_cutoff:
                     genotypes.append('2')
-                elif score <= 0.30:
-                    genotypes.append('0')
-                elif 0.30 < score < 0.80:
+                elif score <= allele_b_cutoff:
                     genotypes.append('1')
+                elif allele_b_cutoff < score < allele_a_cutoff:
+                    genotypes.append('0')
                 else:
                     genotypes.append('N')
             if 'N' not in genotypes:
@@ -594,7 +595,7 @@ def transpose_matrix(in_file, out_file):
     df = df.T
     df.to_csv(out_file, sep='\t', header=False)
 
-def kcf2matrix(ikcf, outprefix, sample):
+def kcf2matrix(ikcf, outprefix, sample, allele_a_cutoff, allele_b_cutoff):
     """
     Convert kcf file to genotype matrix and genotype map file.
     the map file will have the window name, chromosome and the position in TSV format
@@ -605,7 +606,7 @@ def kcf2matrix(ikcf, outprefix, sample):
             samples = [sample]
         elif type(sample) == list:
             samples = sample
-    write_matrix(windows, outprefix, samples)
+    write_matrix(windows, outprefix, samples, allele_a_cutoff, allele_b_cutoff)
     # transpose_gt_matrix(f"{outprefix}.matrix.tr.tsv", f"{outprefix}.matrix.tsv")
     transpose_matrix(f"{outprefix}.matrix.tr.tsv", f"{outprefix}.matrix.tsv")
 
@@ -711,13 +712,91 @@ def extract_samples(input, output, samples):
             for sample in samples:
                 if sample in line:
                     sample_indices.append(line.index(sample))
-            fo.write(f'{list_to_str(line[:6])}\t{list_to_str(samples)}\n')
+            fo.write(f'{list_to_str(line[:6], TAB)}')
+            for i in sample_indices:
+                fo.write(f'\t{line[i]}')
+            fo.write('\n')
             continue
+        line[4] = update_info(line, sample_indices)
         fo.write(f'{list_to_str(line[:6])}\t{list_to_str([line[i] for i in sample_indices])}\n')
     fi.close()
     fo.close()
 
 
+def update_info(line, sample_indices=None):
+    """
+    Update info field, it takes list of KCF fields and list of samples indices
+    """
+    attr_indices = []
+    va = []
+    ob = []
+    di = []
+    sc = []
+    if sample_indices is None:
+        sample_indices = range(6, len(line))
+    for i in line[5].split(':'):
+        if i in ['IB', 'VA', 'OB', 'DI', 'SC']:
+            attr_indices.append(line[5].split(':').index(i))
+    for i in sample_indices:
+        va.append(float(line[i].split(':')[attr_indices[1]]))
+        ob.append(float(line[i].split(':')[attr_indices[2]]))
+        di.append(float(line[i].split(':')[attr_indices[3]]))
+        sc.append(float(line[i].split(':')[attr_indices[4]]))
+    return (f"MIN_SCORE={min(sc)};"
+            f"MAX_SCORE={max(sc)};"
+            f"MEAN_SCORE={round(sum(sc) / len(sc), 2)};"
+            f"MIN_VA={min(va)};"
+            f"MAX_VA={max(va)};"
+            f"MEAN_VA={round(sum(va) / len(va), 2)};"
+            f"MIN_OB={min(ob)};"
+            f"MAX_OB={max(ob)};"
+            f"MEAN_OB={round(sum(ob) / len(ob), 2)};")
+
+
+def get_attributes(input, output, attribute, samples=None):
+    """
+    Extract scores from kcf file for a given list of samples
+    """
+    if attribute not in ['VA', 'OB', 'DI', 'SC']:
+        print_log(f'Error: {attribute} is not a valid attribute')
+        sys.exit(1)
+    sample_indices = []
+    win = 0
+    if type(samples) == str:
+        samples = [samples]
+    elif type(samples) == list:
+        samples = samples
+    elif samples is None:
+        samples = []
+    fi = open(input, 'r')
+    fo = open(output, 'w')
+    fm = open(output + '.map', 'w')
+    print_log(f'Extracting {attribute} from {input}')
+    for line in fi:
+        if line.startswith('##'):
+            continue
+        line = line.strip().split('\t')
+        if line[0].startswith('#CHROM'):
+            if not samples:
+                samples = line[6:]
+            for sample in samples:
+                if sample in line:
+                    sample_indices.append(line.index(sample))
+            fm.write(f'WIN\t{line[0]}\t{line[1]}\t{line[2]}\n')
+            fo.write('WIN')
+            for i in sample_indices:
+                fo.write(f'\t{line[i]}')
+            fo.write('\n')
+            continue
+        win += 1
+        attribute_idx = line[5].split(':').index(attribute)
+        fm.write(f'{win}\t{line[0]}\t{line[1]}\t{line[2]}\n')
+        fo.write(f'{win}')
+        for i in sample_indices:
+            fo.write(f'\t{line[i].split(":")[attribute_idx]}')
+        fo.write('\n')
+    fi.close()
+    fo.close()
 
 
 def main():
@@ -778,6 +857,10 @@ def main():
     parser_kcf2matrix.add_argument('-o', '--output', help='Output prefix', required=True)
     parser_kcf2matrix.add_argument('-s', '--sample',
                                    help='Sample name (if not given, will be taken from input file name)')
+    parser_kcf2matrix.add_argument('-a', '--allele_a_cutoff', help='Allele A cutoff', default=0.8, type=float)
+    parser_kcf2matrix.add_argument('-b', '--allele_b_cutoff', help='Allele B cutoff', default=0.2, type=float)
+
+
 
     # Create the parser for the "split_kcf" command
     parser_split_kcf = subparsers.add_parser('split_kcf', help='Misc: Split kcf file by chromosome')
@@ -801,6 +884,14 @@ def main():
                                         nargs='+', default=None)
     parser_extract_samples.add_argument('-S', '--samples_list', help='File containing list of samples to be extracted', default=None)
 
+    parser_get_scores = subparsers.add_parser('get_attr', help='Misc: Get values of the attributes from kcf file')
+    parser_get_scores.add_argument('-i', '--input', help='Input kcf file', required=True)
+    parser_get_scores.add_argument('-o', '--output', help='Output file', required=True)
+    parser_get_scores.add_argument('-a', '--attribute', help='Attribute to be extracted', required=True, choices=['VA', 'OB', 'DI', 'SC'])
+    parser_get_scores.add_argument('-s', '--sample',
+                                   help='Sample name (if not given, will be taken from input file name)', nargs='+', default=None)
+    parser_get_scores.add_argument('-S', '--samples_list', help='File containing list of samples to be extracted', default=None)
+
     args = parser.parse_args(args=(sys.argv[1:] or ['--help']))
 
     if args.command == 'tsv2kcf':
@@ -816,7 +907,7 @@ def main():
     elif args.command == 'kcf2bedgraph':
         kcf2bedgraph(args.input, args.output, args.sample)
     elif args.command == 'kcf2matrix':
-        kcf2matrix(args.input, args.output, args.sample)
+        kcf2matrix(args.input, args.output, args.sample, args.allele_a_cutoff, args.allele_b_cutoff)
     elif args.command == 'split_kcf':
         split_kcf(args.input, args.output, args.sample, args.chrs)
     elif args.command == 'concat':
@@ -834,6 +925,14 @@ def main():
         else:
             samples = args.samples
         extract_samples(args.input, args.output, samples)
+    elif args.command == 'get_attr':
+        samples = []
+        if args.samples_list is not None:
+            with open(args.samples_list, 'r') as f:
+                samples = [line.strip() for line in f]
+        else:
+            samples = args.sample
+        get_attributes(args.input, args.output, args.attribute, samples)
     else:
         parser.print_help()
         sys.exit(1)

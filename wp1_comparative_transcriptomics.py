@@ -12,10 +12,11 @@ import re
 from datetime import datetime
 from collections import defaultdict
 
-
 # set gloabal constants
 PVALUE_CUTOFF = 0.05
 LFC_CUTOFF = 1
+EMPTY_ANNOTATION = f'-\t-\t-\t-\t-'
+ANNOTATION_HEAD = f"Description\tGO\tKEGG_ko\tKEGG_path\tPFAM"
 
 
 class Annotation(object):
@@ -46,13 +47,16 @@ class Annotation(object):
             self.ann['desc'].append('-')
         if len(self.ann['go']) == 0:
             self.ann['go'].append('-')
-        if len(self.ann['ko']) == 0:
-            self.ann['ko'].append('-')
+        if len(self.ann['kegg_ko']) == 0:
+            self.ann['kegg_ko'].append('-')
+        if len(self.ann['kegg_path']) == 0:
+            self.ann['kegg_path'].append('-')
         if len(self.ann['pfam']) == 0:
             self.ann['pfam'].append('-')
         return f"{'; '.join(self.ann['desc'])}" \
                f"\t{'; '.join(self.ann['go'])}" \
-               f"\t{'; '.join(self.ann['ko'])}" \
+               f"\t{'; '.join(self.ann['kegg_ko'])}" \
+               f"\t{'; '.join(self.ann['kegg_path'])}" \
                f"\t{'; '.join(self.ann['pfam'])}"
 
 
@@ -90,7 +94,9 @@ class AnnotationParser(object):
                 if line[ann_header.index('GOs')] != '-':
                     self.annotations[attr_id].add_ann('go', line[ann_header.index('GOs')])
                 if line[ann_header.index('KEGG_Pathway')] != '-':
-                    self.annotations[attr_id].add_ann('kegg', line[ann_header.index('KEGG_Pathway')])
+                    self.annotations[attr_id].add_ann('kegg_path', line[ann_header.index('KEGG_Pathway')])
+                if line[ann_header.index('KEGG_ko')] != '-':
+                    self.annotations[attr_id].add_ann('kegg_ko', line[ann_header.index('KEGG_ko')])
                 if line[ann_header.index('PFAMs')] != '-':
                     self.annotations[attr_id].add_ann('pfam', line[ann_header.index('PFAMs')])
 
@@ -151,6 +157,18 @@ class OrthogroupsParser(object):
         self.annotation_dict = annotation_dict
         if self.annotation_dict is not None:
             self.annotate_orthogroups()
+        if self.fasta_dict is not None:
+            self.intersect_orthogroups()
+
+    def intersect_orthogroups(self):
+        """
+        removed the gene ids from the orthogroups that are not present in the fasta files
+        """
+        for orthogroup in self.orthogroups:
+            for reference in self.orthogroups[orthogroup]:
+                for attr_id in self.orthogroups[orthogroup][reference]:
+                    if attr_id not in self.fasta_dict[reference].fasta:
+                        self.orthogroups[orthogroup][reference].remove(attr_id)
 
     def parse_orthogroups(self):
         if self.iformat == 'orthofinder':
@@ -311,7 +329,7 @@ class OrthogroupsParser(object):
                 "annotation files")
         print_log(f"Writing orthogroups to transcript table: {output_prefix}.orthogroups.map.tsv")
         with open(f"{output_prefix}.orthogroups.map.tsv", 'w') as f:
-            f.write(f"Orthogroup\tTranscript\tDescription\tGO\tKEGG\tPFAM\n")
+            f.write(f"Orthogroup\tTranscript\t{ANNOTATION_HEAD}\n")
             for orthogroup in sorted(self.orthogroups):
                 for reference in self.orthogroups[orthogroup]:
                     if reference not in self.annotation_dict:
@@ -321,7 +339,7 @@ class OrthogroupsParser(object):
                         if attr_id in self.annotation_dict[reference].annotations:
                             f.write(f"\t{self.annotation_dict[reference].annotations[attr_id]}\n")
                         else:
-                            f.write(f"\t-\t-\t-\t-\n")
+                            f.write(f"\t{EMPTY_ANNOTATION}\n")
 
     def write_orthogroups_annotations(self, output_prefix):
         """
@@ -332,9 +350,9 @@ class OrthogroupsParser(object):
                 "Annotation dictionary is required for writing orthogroups annotations. please provide annotation files")
         print_log(f"Writing orthogroups annotations: {output_prefix}.orthogroups.annotations.tsv")
         with open(f"{output_prefix}.orthogroups.annotations.tsv", 'w') as f:
-            f.write(f"Orthogroup\tDescription\tGO\tKEGG\tPFAM\n")
+            f.write(f"Orthogroup\t{ANNOTATION_HEAD}\n")
             for orthogroup in sorted(self.orthogroups_annotations):
-                f.write(f"{self.orthogroups_annotations[orthogroup]}\n")
+                f.write(f"{orthogroup}\t{self.orthogroups_annotations[orthogroup]}\n")
 
     def summary(self):
         """
@@ -398,13 +416,13 @@ class OrthogroupsParser(object):
         for reference in self.references:
             if reference not in deg_dict:
                 continue
-            diff_dict = defaultdict(lambda : defaultdict(float))
+            diff_dict = defaultdict(lambda: defaultdict(float))
             for sample in deg_dict[reference]:
                 fo = open(f"{out_prefix}.{reference}_{sample}.orthogroups.summary.tsv", 'w')
                 fo.write(f"Orthogroup\tnum_attributes\tnum_deg\tnum_up\tnum_down\tratio_deg\tratio_up\tattributes"
                          f"\tratio_down\tdiff")
                 if self.annotation_dict is not None:
-                    fo.write(f"\tDescription\tGO\tKEGG\tPFAM\n")
+                    fo.write(f"\t{ANNOTATION_HEAD}\n")
                 else:
                     fo.write("\n")
                 for orthogroup in self.orthogroups:
@@ -440,7 +458,7 @@ class OrthogroupsParser(object):
                         if orthogroup in self.orthogroups_annotations:
                             fo.write(f"\t{self.orthogroups_annotations[orthogroup]}\n")
                         else:
-                            fo.write(f"\t-\t-\t-\t-\n")
+                            fo.write(f"\t{EMPTY_ANNOTATION}\n")
                     else:
                         fo.write("\n")
                     diff_dict[orthogroup][sample] = diff
@@ -450,6 +468,8 @@ class OrthogroupsParser(object):
             for sample in deg_dict[reference]:
                 fr.write(f"\t{sample}")
             fr.write("\n")
+            if self.orthogroups_annotations is not None:
+                fr.write(f"{ANNOTATION_HEAD}\n")
             for orthogroup in diff_dict:
                 fr.write(f"{orthogroup}")
                 for sample in deg_dict[reference]:
@@ -457,8 +477,54 @@ class OrthogroupsParser(object):
                 if orthogroup in self.orthogroups_annotations:
                     fr.write(f"\t{self.orthogroups_annotations[orthogroup]}\n")
                 else:
-                    fr.write(f"\t-\t-\t-\t-\n")
+                    fr.write(f"\t{EMPTY_ANNOTATION}\n")
             fr.close()
+
+    def write_orthogroups_tpm(self, output, tpms, metadata=None):
+        """
+        write orthogroups tpm table
+        """
+        for reference in self.references:
+            print_log(f"Writing orthogroups tpm table: {output}.{reference}.orthogroups.tpm.tsv")
+            fo = open(f"{output}.{reference}.orthogroups.tpm.tsv", 'w')
+            fo.write(f"Orthogroup")
+            if metadata is not None:
+                for sample in metadata.data:
+                    is_sample = False
+                    for replicate in metadata.data[sample].replicates:
+                        if replicate not in tpms.samples:
+                            continue
+                        is_sample = True
+                        break
+                    if is_sample:
+                        fo.write(f"\t{sample}")
+            else:
+                for sample in tpms.data:
+                    fo.write(f"\t{sample}")
+            fo.write("\n")
+            for orthogroup in self.orthogroups:
+                fo.write(f"{orthogroup}")
+                if metadata is not None:
+                    for sample in metadata.data:
+                        is_sample = False
+                        for replicate in metadata.data[sample].replicates:
+                            if replicate not in tpms.samples:
+                                continue
+                            is_sample = True
+                            break
+                        if is_sample:
+                            tpm = 0.00
+                            for attr_id in self.orthogroups[orthogroup][reference]:
+                                tpm += tpms.get_tpm(attr_id, metadata.data[sample].replicates)
+                            fo.write(f"\t{round(tpm, 2)}")
+                else:
+                    for sample in tpms.data:
+                        tpm = 0.00
+                        for attr_id in self.orthogroups[orthogroup][reference]:
+                            tpm += tpms.get_tpm(attr_id, sample)
+                        fo.write(f"\t{tpm}")
+                fo.write("\n")
+            fo.close()
 
 
 class DEG(object):
@@ -586,7 +652,7 @@ class DEGParser(object):
         with open(f"{output_prefix}.deg.ann.tsv", 'w') as f:
             f.write(f"Gene\tlog2FoldChange\tpvalue\tpadj")
             if self.annotation_dict is not None:
-                f.write(f"\tDescription\tGO\tKEGG\tPFAM\n")
+                f.write(f"\t{ANNOTATION_HEAD}\n")
             else:
                 f.write("\n")
             for attr_id in self.deg:
@@ -601,7 +667,7 @@ class DEGParser(object):
                             f.write(f"\t{self.annotation_dict[reference].annotations[attr_id]}\n")
                             break
                         else:
-                            f.write(f"\t-\t-\t-\t-\n")
+                            f.write(f"\t{EMPTY_ANNOTATION}\n")
                 else:
                     f.write("\n")
 
@@ -645,7 +711,7 @@ class GeneToTransMapParser(object):
             for line in f:
                 line = line.rstrip().split()
                 if line[0] not in self.map:
-                    print(f"Map: {line[0]}")
+                    # print(f"Map: {line[0]}")
                     self.map[line[0]] = []
                 self.map[line[0]].append(GeneToTransMap(line[1], line[0]))
 
@@ -778,6 +844,103 @@ def compare_orthogroups(og_one, og_two):
     tabulate(out_table, header=True)
 
 
+class Sample(object):
+    def __init__(self, sample_name):
+        self.name = sample_name
+        self.replicates = []
+        self.traits = {}
+
+    def add_replicate(self, replicate):
+        self.replicates.append(replicate)
+
+    def add_trait(self, trait, value):
+        self.traits[trait] = value
+
+
+class MetadataParser:
+    def __init__(self, metadata_file):
+        self.metadata_file = metadata_file
+        self.data = {}
+        self.parse_metadata()
+
+    def parse_metadata(self):
+        print_log(f"Reading metadata file: {self.metadata_file}")
+        with open(self.metadata_file) as f:
+            for i, line in enumerate(f):
+                line = line.rstrip().split("\t")
+                if i == 0:
+                    header = line
+                    continue
+                sample = line[header.index('name')]
+                rep = line[header.index('run')]
+                if sample not in self.data:
+                    self.data[sample] = Sample(sample)
+                self.data[sample].add_replicate(rep)
+                for trait in header:
+                    if trait in ['name', 'run']:
+                        continue
+                    self.data[sample].add_trait(trait, line[header.index(trait)])
+
+
+class TPMParser:
+    def __init__(self, tpm_file):
+        self.tpm_file = tpm_file
+        self.data = defaultdict(lambda: defaultdict(float))
+        self.samples = []
+        self.parse_tpm()
+
+    def parse_tpm(self):
+        print_log(f"Reading TPM file: {self.tpm_file}")
+        with open(self.tpm_file) as f:
+            for i, line in enumerate(f):
+                line = line.rstrip().split("\t")
+                if i == 0:
+                    header = line
+                    self.samples = header[1:]
+                    continue
+                attr_id = line[0]
+                if attr_id not in self.data:
+                    self.data[attr_id] = defaultdict(float)
+                for sample in header[1:]:
+                    self.data[attr_id][sample] = float(line[header.index(sample)])
+
+    def get_tpm(self, attr_id, samples):
+        tpm = []
+        for sample in samples:
+            tpm.append(self.data[attr_id][sample])
+        return sum(tpm) / len(tpm)
+
+
+
+
+class CountMatrixParser:
+    # TODO: add metadata parser and make changes to the constructor
+    def __init__(self, count_matrix_file, metadata_file):
+        self.count_matrix_file = count_matrix_file
+        self.metadata_file = metadata_file
+        self.data = defaultdict(lambda: defaultdict(float))
+        self.samples = []
+        self.parse_count_matrix()
+
+    def parse_count_matrix(self):
+        print_log(f"Reading count matrix file: {self.count_matrix_file}")
+        with open(self.count_matrix_file) as f:
+            for i, line in enumerate(f):
+                line = line.rstrip().split("\t")
+                if i == 0:
+                    header = line
+                    self.samples = header[1:]
+                    continue
+                attr_id = line[0]
+                if attr_id not in self.data:
+                    self.data[attr_id] = defaultdict(float)
+                for sample in header[1:]:
+                    self.data[attr_id][sample] = float(line[header.index(sample)])
+
+
+
+
+
 def main():
     start_time = datetime.now()
     parser = argparse.ArgumentParser(
@@ -887,6 +1050,67 @@ def main():
                         type=float,
                         default=LFC_CUTOFF)
 
+    og_ann = subparsers.add_parser('og_ann',
+                                   help='annotate orthogroups',
+                                   description='annotate orthogroups')
+    og_ann.add_argument('-i', '--input',
+                        help='input orthogroups file (in orthotable format)',
+                        required=True)
+    og_ann.add_argument('-a', '--annotation',
+                        help='input annotation file(s). Make sure to provide annotation for all the species involved',
+                        required=True,
+                        nargs='+')
+    og_ann.add_argument('-o', '--output',
+                        help='output prefix',
+                        required=True)
+
+    og_tpm = subparsers.add_parser('og_tpm',
+                                   help='export TPM for orthogroups from count matrix',
+                                   description='export TPM for orthogroups from count matrix')
+    og_tpm.add_argument('-i', '--input',
+                        help='input orthogroups file (in orthotable format)',
+                        required=True)
+    og_tpm.add_argument('-c', '--count',
+                        help='input count matrix file',
+                        required=True)
+    og_tpm.add_argument('-m', '--metadata',
+                        help='input metadata file')
+    og_tpm.add_argument('-o', '--output',
+                        help='output prefix',
+                        required=True)
+
+    longest_isofrom = subparsers.add_parser('longest_isoform',
+                                            help='extract longest isoform from each gene',
+                                            description='extract longest isoform from each gene')
+    longest_isofrom.add_argument('-i', '--input',
+                                 help='input fasta file',
+                                 required=True)
+    longest_isofrom.add_argument('-o', '--output',
+                                 help='output fasta file',
+                                 required=True)
+    longest_isofrom.add_argument('-m', '--map',
+                                 help='transcript to gene map file in {gene_id}\\t{transcript_id} format',
+                                 required=True)
+
+    summarize_isoforms = subparsers.add_parser('summarize_isoforms',
+                                               help='summarize isoforms',
+                                               description='summarize isoforms')
+    summarize_isoforms.add_argument('-m', '--map',
+                                    help='transcript to gene map file in {gene_id}\\t{transcript_id} format',
+                                    required=True)
+    summarize_isoforms.add_argument('-c', '--count',
+                                    help='input count matrix file',
+                                    required=True)
+    summarize_isoforms.add_argument('-f', '--fasta',
+                                    help='input isoforms fasta file',
+                                    required=True)
+    summarize_isoforms.add_argument('-p', '--phenotype',
+                                    help='input phenotype file',
+                                    required=True)
+    summarize_isoforms.add_argument('-o', '--output',
+                                    help='output prefix',
+                                    required=True)
+
     args = parser.parse_args(args=None if sys.argv[1:] else ['--help'])
 
     if args.command == 'convert':
@@ -940,6 +1164,74 @@ def main():
             reference, sample, deg_method = get_names(deg_file, 'deg')
             deg_dict[reference][sample] = DEGParser(deg_file, deg_method, annotation_dict, args.lfc, args.pvalue)
         orthogroups.summarize_DEGs(args.output, deg_dict, args.pvalue, args.lfc)
+    elif args.command == 'og_ann':
+        annotation_dict = defaultdict(AnnotationParser)
+        for annotation_file in args.annotation:
+            reference, ann_format = get_names(annotation_file, 'annotation')
+            if reference in annotation_dict:
+                raise Exception(f"Duplicate reference name found: {reference}")
+            annotation_dict[reference] = AnnotationParser(reference, os.path.realpath(annotation_file))
+        orthogroups = OrthogroupsParser(args.input, 'orthotable', None, annotation_dict)
+        orthogroups.write_orthogroups_annotations(args.output)
+    elif args.command == 'og_tpm':
+        orthogroups = OrthogroupsParser(args.input, 'orthotable')
+        if args.metadata is not None:
+            metadata = MetadataParser(args.metadata)
+        else:
+            metadata = None
+        tpms = TPMParser(args.count)
+        orthogroups.write_orthogroups_tpm(args.output, tpms, metadata)
+    elif args.command == 'longest_isoform':
+        # check if the input file exists
+        if os.path.isfile(f'{args.input}.fai'):
+            # read the fasta index file
+            print_log(f"Reading fasta index file: {args.input}.fai")
+            with open(f'{args.input}.fai') as f:
+                fasta_index = {}
+                for line in f:
+                    line = line.rstrip().split("\t")
+                    fasta_index[line[0]] = int(line[1])
+        else:
+            # read fasta file and get length of each sequence
+            print_log(f"Reading fasta file: {args.input}")
+            fasta_index = {}
+            with open(args.input) as f:
+                for line in f:
+                    line = line.rstrip()
+                    if line.startswith('>'):
+                        attr_id = line[1:].split()[0]
+                        fasta_index[attr_id] = 0
+                    else:
+                        fasta_index[attr_id] += len(line)
+
+        # read the map file
+        map_dict = GeneToTransMapParser(args.map)
+        # read the fasta file
+        fasta = FastaParser(args.input)
+        # write the longest isoform fasta file
+        print_log(f"Writing longest isoform fasta file: {args.output}")
+        with open(args.output, 'w') as f:
+            for gene_id in map_dict.map:
+                longest_isoform = None
+                longest_isoform_len = 0
+                for attr_id in map_dict.get_attrs(gene_id):
+                    if attr_id not in fasta_index:
+                        continue
+                    if fasta_index[attr_id] > longest_isoform_len:
+                        longest_isoform_len = fasta_index[attr_id]
+                        longest_isoform = attr_id
+                if longest_isoform is None:
+                    print_log(f"WARNING: No isoform found for gene: {gene_id}")
+                    continue
+                f.write(f">{longest_isoform}\n{fold_sequence(fasta.fasta[longest_isoform].sequence)}\n")
+    elif args.command == 'summarize_isoforms':
+        # read the map file
+        map_dict = GeneToTransMapParser(args.map)
+        # read the fasta file
+        fasta = FastaParser(args.fasta)
+        # read the count matrix file
+        count_matrix = CountMatrixParser(args.count, args.phenotype)
+
     else:
         parser.print_help()
         sys.exit(1)
