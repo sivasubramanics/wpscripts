@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import shutil
 import sys
 import argparse
 import time
@@ -608,6 +609,28 @@ def transpose_matrix(in_file, out_file):
     df = df.T
     df.to_csv(out_file, sep='\t', header=False)
 
+
+def convert_tsv2RData(tsv_list):
+    """
+    Convert tsv file to RData file
+    """
+    # if Rscript is not installed, exit
+    if not shutil.which('Rscript'):
+        sys.exit('Error: Rscript is not installed')
+
+    for in_tsv in tsv_list:
+        out_rdata = f"{in_tsv}.RData"
+        print_log(f'Converting {in_tsv} to {out_rdata}')
+        rscript = f"{os.path.dirname(os.path.realpath(__file__))}/{time.strftime('%Y%m%d-%H%M%S')}.tsv2RData.R"
+        rscript_fo = open(rscript, 'w')
+        rscript_fo.write(f"myGD <- read.table(\"{os.path.abspath(in_tsv)}\", header=TRUE)\n")
+        rscript_fo.write(f"save(myGD, file=\"{os.path.abspath(out_rdata)}\")\n")
+        rscript_fo.close()
+        cmd = f"Rscript {rscript}"
+        os.system(cmd)
+        os.remove(rscript)
+
+
 def kcf2matrix(ikcf, outprefix, sample, allele_a_cutoff, allele_b_cutoff):
     """
     Convert kcf file to genotype matrix and genotype map file.
@@ -622,7 +645,7 @@ def kcf2matrix(ikcf, outprefix, sample, allele_a_cutoff, allele_b_cutoff):
     write_matrix(windows, outprefix, samples, allele_a_cutoff, allele_b_cutoff)
     # transpose_gt_matrix(f"{outprefix}.matrix.tr.tsv", f"{outprefix}.matrix.tsv")
     transpose_matrix(f"{outprefix}.matrix.tr.tsv", f"{outprefix}.matrix.tsv")
-
+    convert_tsv2RData(f"{outprefix}.matrix.tsv", f"{outprefix}.map.tsv")
 
 def list_to_str(in_list, sep='\t'):
     """
