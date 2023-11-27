@@ -528,6 +528,19 @@ def ibs_to_binary(in_str):
         return '1'
 
 
+def monomorphic(genotypes):
+    """
+    Check if the genotypes are monomorphic
+    """
+    # delete the Ns in geneotypes
+    genotypes = [x for x in genotypes if x != 'N']
+    genotypes = list(set(genotypes))
+    if len(genotypes) == 1:
+        return True
+    else:
+        return False
+
+
 def write_matrix(windows, output, samples=None, allele_a_cutoff=0.8, allele_b_cutoff=0.3):
     """
     Write genotype matrix
@@ -560,7 +573,7 @@ def write_matrix(windows, output, samples=None, allele_a_cutoff=0.8, allele_b_cu
                     genotypes.append('0')
                 else:
                     genotypes.append('N')
-            if 'N' not in genotypes:
+            if 'N' not in genotypes and not monomorphic(genotypes):
                 f_matrix.write(f'{i + 1}\t' + '\t'.join(genotypes) + '\n')
                 f_map.write(f'{i+1}\t{key[0]}\t{key[1]}\n')
 
