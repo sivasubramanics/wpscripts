@@ -623,8 +623,12 @@ def convert_tsv2RData(*tsv_list):
         print_log(f'Converting {in_tsv} to {out_rdata}')
         rscript = f"{os.path.dirname(os.path.realpath(__file__))}/{time.strftime('%Y%m%d-%H%M%S')}.tsv2RData.R"
         rscript_fo = open(rscript, 'w')
-        rscript_fo.write(f"myGD <- read.table(\"{os.path.abspath(in_tsv)}\", header=TRUE)\n")
-        rscript_fo.write(f"save(myGD, file=\"{os.path.abspath(out_rdata)}\")\n")
+        if in_tsv.endswith('.matrix.tsv'):
+            rscript_fo.write(f"myGD <- read.table(\"{os.path.abspath(in_tsv)}\", header=TRUE)\n")
+            rscript_fo.write(f"save(myGD, file=\"{os.path.abspath(out_rdata)}\")\n")
+        elif in_tsv.endswith('.map.tsv'):
+            rscript_fo.write(f"myGM <- read.table(\"{os.path.abspath(in_tsv)}\", header=TRUE)\n")
+            rscript_fo.write(f"save(myGM, file=\"{os.path.abspath(out_rdata)}\")\n")
         rscript_fo.close()
         cmd = f"Rscript {rscript}"
         os.system(cmd)
