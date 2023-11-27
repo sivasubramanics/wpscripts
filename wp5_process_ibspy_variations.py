@@ -610,7 +610,7 @@ def transpose_matrix(in_file, out_file):
     df.to_csv(out_file, sep='\t', header=False)
 
 
-def convert_tsv2RData(tsv_list):
+def convert_tsv2RData(*tsv_list):
     """
     Convert tsv file to RData file
     """
