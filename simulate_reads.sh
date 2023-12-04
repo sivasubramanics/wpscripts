@@ -26,7 +26,7 @@ insert_len=700
 insert_std=200
 mapping=false
 threads=1
-rate_of_mutation=0.0001
+rate_of_mutation=0.00001
 frac_of_indels=0.015
 WGSIM_MISC="-r ${rate_of_mutation} -R ${frac_of_indels}"
 
