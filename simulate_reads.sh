@@ -26,6 +26,9 @@ insert_len=700
 insert_std=200
 mapping=false
 threads=1
+rate_of_mutation=0.0001
+frac_of_indels=0.015
+WGSIM_MISC="-r ${rate_of_mutation} -R ${frac_of_indels}"
 
 # function to write fasta_length.sh
 write_fasta_length_script(){
@@ -307,7 +310,7 @@ for i in $(seq 1 $n_samples); do
         prefix=$ref_name"_"$type"_"sample_$i
         cov=$(get_cov $coverage 0.1)
         n_reads=$(echo "$cov * $length / 100 / 2" | bc)
-        run_cmd "wgsim -d $insert_len -s $insert_std -1 $read_length -2 $read_length -N $n_reads $ref_fa $out_dir/reads/$prefix.1.fq $out_dir/reads/$prefix.2.fq > $out_dir/reads/$prefix.vars 2> $out_dir/logs/wgsim_$prefix.log"
+        run_cmd "wgsim ${WGSIM_MISC} -d $insert_len -s $insert_std -1 $read_length -2 $read_length -N $n_reads $ref_fa $out_dir/reads/$prefix.1.fq $out_dir/reads/$prefix.2.fq > $out_dir/reads/$prefix.vars 2> $out_dir/logs/wgsim_$prefix.log"
         run_cmd "pigz -f $out_dir/reads/$prefix.1.fq $out_dir/reads/$prefix.2.fq"
         if [ "$mapping" == "true" ]; then
             rm -f $out_dir/logs/mapping_$prefix.log
@@ -324,7 +327,7 @@ for i in $(seq 1 $n_samples); do
             prefix=$ref_name"_"$type"_"sample_$i"_"rep_$j
             cov=$(get_cov $cov 0.001)
             n_reads=$(echo "$cov * $length / 100 / 2" | bc)
-            run_cmd "wgsim -d $insert_len -s $insert_std -1 $read_length -2 $read_length -N $n_reads $ref_fa $out_dir/reads/$prefix.1.fq $out_dir/reads/$prefix.2.fq > $out_dir/reads/$prefix.vars 2> $out_dir/logs/wgsim_$prefix.log"
+            run_cmd "wgsim ${WGSIM_MISC} -d $insert_len -s $insert_std -1 $read_length -2 $read_length -N $n_reads $ref_fa $out_dir/reads/$prefix.1.fq $out_dir/reads/$prefix.2.fq > $out_dir/reads/$prefix.vars 2> $out_dir/logs/wgsim_$prefix.log"
             run_cmd "pigz -f $out_dir/reads/$prefix.1.fq $out_dir/reads/$prefix.2.fq"
             if [ "$mapping" == "true" ]; then
                 rm -f $out_dir/logs/mapping_$prefix.log
