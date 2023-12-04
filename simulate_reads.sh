@@ -277,7 +277,8 @@ if [ ! -f $ref_genome_fa ] || [ ! -f $ref_rna_fa ] || [ ! -f $ref_gff ]; then
     print_log "Unzipping reference genome"
     run_cmd "unzip -o -q $out_dir/download/ncbi_dataset.zip -d $out_dir/download > $out_dir/logs/unzip.log 2>&1"
     print_log "Moving reference genome to $out_dir/genome"
-    run_cmd "mv $out_dir/download/ncbi_dataset/data/GCF_000146045.2/$ref*_genomic.fna $ref_genome_fa"
+    genome_file=$(find $out_dir/download -name *_genomic.fna)
+    run_cmd "mv $genome_file $ref_genome_fa"
     run_cmd "mv $out_dir/download/ncbi_dataset/data/GCF_000146045.2/genomic.gff $ref_gff"
     run_cmd "mv $out_dir/download/ncbi_dataset/data/GCF_000146045.2/rna.fna $ref_rna_fa"
 fi
