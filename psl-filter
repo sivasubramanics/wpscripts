@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+
+usage(){
+    echo "Usage: $0 [-h] [-i input.psl] [-o output.psl] [-q min_query_coverage] [-t min_target_coverage]"
+    echo "Options:"
+    echo "  -i STR    input psl file (must not contain header)"
+    echo "  -o STR    output psl file"
+    echo "  -q INT    minimum query coverage"
+    echo "  -t INT    minimum target coverage"
+    echo "  -b INT    maximum number of blocks"
+    echo "  -h        help"
+    exit 1
+}
+
+
+# hi
+
+
+# default values
+min_query_coverage=80
+min_target_coverage=80
+max_blocks=100
+
+
+while getopts "i:o:q:t:b:h" opt; do
+    case $opt in
+        i) input=$OPTARG;;
+        o) output=$OPTARG;;
+        q) min_query_coverage=$OPTARG;;
+        t) min_target_coverage=$OPTARG;;
+        b) max_blocks=$OPTARG;;
+        h) usage;;
+        *) usage;;
+    esac
+done
+
+awk -v min_query_coverage=$min_query_coverage -v min_target_coverage=$min_target_coverage -v max_blocks=$max_blocks '
+BEGIN{
+    FS="\t";
+    OFS="\t";
+}
+{
+    split($18, block_sizes, ",");
+    for (i=1; i<=length(block_sizes); i++) {
+        aln_len+=block_sizes[i];
+    }
+    if ((aln_len*100)/$10 < min_query_coverage){
+        next;
+    }
+    if ((aln_len*100)/$14 < min_target_coverage){
+        next;
+    }
+    if (length(block_sizes) > max_blocks){
+        next;
+    }
+    print $0;
+}' $input > $output
+
