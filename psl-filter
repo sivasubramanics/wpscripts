@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
+# script to filter the psl file (from blat output) to remove the alignments with low identity and coverage
+# usage: python filter_psl.py -i <input_psl> -o <output_psl> -q <query_coverage_threshold> -d <identity_threshold> -b <max_blocks_threshold>
+# contact: siva.selvanayagam[at]wur.nl
+# data: 06-12-2023
 
 import argparse
-import os
 
 def main():
     parser = argparse.ArgumentParser(description='filter the psl file (from blat output) to remove the alignments '
@@ -13,10 +16,14 @@ def main():
     parser.add_argument('-b', '--nblocks', help='maximum number of blocks threshold', type=int, default=100)
     args = parser.parse_args()
 
+
     with open(args.input, 'r') as f, open(args.output, 'w') as g:
         # check if the file has header
         for line in f:
             line = line.strip().split('\t')
+            # for every 1000 lines, print . to show progress
+            if int(line[0]) % 1000 == 0:
+                print('.', end='', flush=True)
             if len(line) < 21:
                 g.write('\t'.join(line) + '\n')
                 continue
