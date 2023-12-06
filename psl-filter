@@ -8,9 +8,9 @@ def main():
                                                  'with low identity and coverage')
     parser.add_argument('-i', '--input', help='input psl file', required=True)
     parser.add_argument('-o', '--output', help='output psl file', required=True)
-    parser.add_argument('-q', '--q_cov', help='query coverage threshold', required=True, type=float, default=0.8)
-    parser.add_argument('-d', '--idty', help='identity threshold', required=True, type=float, default=0.8)
-    parser.add_argument('-b', '--nblocks', help='maximum number of blocks threshold', required=True, type=int, default=100)
+    parser.add_argument('-q', '--q_cov', help='query coverage threshold', type=float, default=0.8)
+    parser.add_argument('-d', '--idty', help='identity threshold', type=float, default=0.8)
+    parser.add_argument('-b', '--nblocks', help='maximum number of blocks threshold', type=int, default=100)
     args = parser.parse_args()
 
     with open(args.input, 'r') as f, open(args.output, 'w') as g:
