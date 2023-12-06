@@ -21,9 +21,6 @@ def main():
         # check if the file has header
         for line in f:
             line = line.strip().split('\t')
-            # for every 1000 lines, print . to show progress
-            if int(line[0]) % 1000 == 0:
-                print('.', end='', flush=True)
             if len(line) < 21:
                 g.write('\t'.join(line) + '\n')
                 continue
