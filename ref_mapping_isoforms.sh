@@ -7,6 +7,10 @@
 set -e
 set -u
 
+YELLOW='\033[1;33m'
+ULINE='\033[4m'
+NC='\033[0m'
+
 # function to print log
 function print_log(){
     echo "[`date +'%Y-%m-%d %H:%M:%S'`] LOG: ${YELLOW}${ULINE}$1${NC}"
