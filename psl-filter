@@ -1,58 +1,36 @@
-#!/usr/bin/env bash
+#!/usr/bin/env python3
 
-usage(){
-    echo "Usage: $0 [-h] [-i input.psl] [-o output.psl] [-q min_query_coverage] [-t min_target_coverage]"
-    echo "Options:"
-    echo "  -i STR    input psl file (must not contain header)"
-    echo "  -o STR    output psl file"
-    echo "  -q INT    minimum query coverage"
-    echo "  -t INT    minimum target coverage"
-    echo "  -b INT    maximum number of blocks"
-    echo "  -h        help"
-    exit 1
-}
+import argparse
+import os
+
+def main():
+    parser = argparse.ArgumentParser(description='filter the psl file (from blat output) to remove the alignments '
+                                                 'with low identity and coverage')
+    parser.add_argument('-i', '--input', help='input psl file', required=True)
+    parser.add_argument('-o', '--output', help='output psl file', required=True)
+    parser.add_argument('-q', '--q_cov', help='query coverage threshold', required=True, type=float, default=0.8)
+    parser.add_argument('-d', '--idty', help='identity threshold', required=True, type=float, default=0.8)
+    parser.add_argument('-b', '--nblocks', help='maximum number of blocks threshold', required=True, type=int, default=100)
+    args = parser.parse_args()
+
+    with open(args.input, 'r') as f, open(args.output, 'w') as g:
+        # check if the file has header
+        for line in f:
+            line = line.strip().split('\t')
+            if len(line) < 21:
+                g.write('\t'.join(line) + '\n')
+                continue
+            aln_len = sum([int(i) for i in line[18].split(',')[:-1]])
+            q_cov = aln_len / int(line[10])
+            idty = int(line[0]) / int(line[10])
+            if q_cov <= args.q_cov:
+                continue
+            if idty <= args.idty:
+                continue
+            if int(line[17]) > args.nblocks:
+                continue
+            g.write('\t'.join(line) + '\n')
 
 
-# hi
-
-
-# default values
-min_query_coverage=80
-min_target_coverage=80
-max_blocks=100
-
-
-while getopts "i:o:q:t:b:h" opt; do
-    case $opt in
-        i) input=$OPTARG;;
-        o) output=$OPTARG;;
-        q) min_query_coverage=$OPTARG;;
-        t) min_target_coverage=$OPTARG;;
-        b) max_blocks=$OPTARG;;
-        h) usage;;
-        *) usage;;
-    esac
-done
-
-awk -v min_query_coverage=$min_query_coverage -v min_target_coverage=$min_target_coverage -v max_blocks=$max_blocks '
-BEGIN{
-    FS="\t";
-    OFS="\t";
-}
-{
-    split($18, block_sizes, ",");
-    for (i=1; i<=length(block_sizes); i++) {
-        aln_len+=block_sizes[i];
-    }
-    if ((aln_len*100)/$10 < min_query_coverage){
-        next;
-    }
-    if ((aln_len*100)/$14 < min_target_coverage){
-        next;
-    }
-    if (length(block_sizes) > max_blocks){
-        next;
-    }
-    print $0;
-}' $input > $output
-
+if __name__ == "__main__":
+    main()
