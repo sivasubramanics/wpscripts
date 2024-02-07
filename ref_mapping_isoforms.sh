@@ -7,13 +7,10 @@
 set -e
 set -u
 
-YELLOW='\033[1;33m'
-ULINE='\033[4m'
-NC='\033[0m'
 
 # function to print log
 function print_log(){
-    echo "[`date +'%Y-%m-%d %H:%M:%S'`] LOG: ${YELLOW}${ULINE}$1${NC}"
+    echo "[`date +'%Y-%m-%d %H:%M:%S'`] LOG: $1"
 }
 
 
@@ -67,6 +64,11 @@ for tool in minimap2 bedToGenePred paftools.js gffcompare; do
             gffcompare)
                 echo "gffcompare is not installed. You may install using the below command"
                 echo "mamba install gffcompare"
+                exit 1
+                ;;
+            genePredToGtf)
+                echo "genePredToGtf is not installed. You may install using the below command"
+                echo "mamba install ucsc-genepredtogtf"
                 exit 1
                 ;;
         esac

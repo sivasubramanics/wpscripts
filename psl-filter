@@ -16,7 +16,6 @@ def main():
     parser.add_argument('-b', '--nblocks', help='maximum number of blocks threshold', type=int, default=100)
     args = parser.parse_args()
 
-
     with open(args.input, 'r') as f, open(args.output, 'w') as g:
         # check if the file has header
         for line in f:
