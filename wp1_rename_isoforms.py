@@ -67,6 +67,7 @@ def get_ids(fa_name, asm_type):
     elif asm_type == "evigene":
         g_id = re.search(r"(NonamEVm\d+)t\d+", fa_name).group(1)
         t_id = re.search(r"(NonamEVm\d+t\d+)", fa_name).group(1)
+        print(g_id, t_id)
     else:
         print("Assembly type not recognized")
         sys.exit(1)
