@@ -91,8 +91,9 @@ def main():
         if g_id not in genes:
             genes[g_id] = []
         genes[g_id].append(t_id)
-        new_gene_name = f"{args.prefix}_g{len(genes)}"
-        new_isoforms_name = f"{args.prefix}_g{len(genes)}.i{genes[g_id].index(t_id)+1}"
+        # get index of g_id in genes and add 1 to get the gene number
+        new_gene_name = f"{args.prefix}_g{list(genes.keys()).index(g_id)+1}"
+        new_isoforms_name = f"{new_gene_name}.i{genes[g_id].index(t_id)+1}"
         fm.write(f"{new_isoforms_name}\t{fasta.name}\n")
         fasta.name = new_isoforms_name
         fo.write(f"{str(fasta)}\n")
