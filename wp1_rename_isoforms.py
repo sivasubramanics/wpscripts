@@ -64,6 +64,9 @@ def get_ids(fa_name, asm_type):
     elif asm_type == "fasta":
         g_id = re.search(r"(.+)", fa_name).group(1)
         t_id = re.search(r"(.+)", fa_name).group(1)
+    elif asm_type == "evigene":
+        g_id = re.search(r"(NonamEVm\d+)t\d+", fa_name).group(1)
+        t_id = re.search(r"(NonamEVm\d+t\d+)", fa_name).group(1)
     else:
         print("Assembly type not recognized")
         sys.exit(1)
@@ -75,7 +78,7 @@ def main():
     parser.add_argument('-f', '--fasta', help='input fasta file', required=True)
     parser.add_argument('-p', '--prefix', help='prefix to add to fasta headers', required=True)
     parser.add_argument('-o', '--output', help='output fasta file', required=True)
-    parser.add_argument('-t', '--type', help='assembly type', choices=['trinity', 'rnaspades', 'fasta'], required=True)
+    parser.add_argument('-t', '--type', help='assembly type', choices=['trinity', 'rnaspades', 'fasta', 'evigene'], required=True)
     args = parser.parse_args()
 
     fo = open(args.output, 'w')
@@ -93,6 +96,7 @@ def main():
         fasta.name = new_isoforms_name
         fo.write(f"{str(fasta)}\n")
         fgtr.write(f"{new_gene_name}\t{new_isoforms_name}\n")
+
 
 if __name__ == '__main__':
     main()
