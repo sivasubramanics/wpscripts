@@ -5,35 +5,149 @@
 # data: 06-12-2023
 
 import argparse
+import sys
+from collections import defaultdict
+
+class PSL:
+    def __init__(self, line):
+        self.line = line.strip().split('\t')
+        self.matches = int(self.line[0])
+        self.mismatches = int(self.line[1])
+        self.rep_matches = int(self.line[2])
+        self.n_count = int(self.line[3])
+        self.q_num_insert = int(self.line[4])
+        self.q_base_insert = int(self.line[5])
+        self.t_num_insert = int(self.line[6])
+        self.t_base_insert = int(self.line[7])
+        self.strand = self.line[8]
+        self.q_name = self.line[9]
+        self.q_size = int(self.line[10])
+        self.q_start = int(self.line[11])
+        self.q_end = int(self.line[12])
+        self.t_name = self.line[13]
+        self.t_size = int(self.line[14])
+        self.t_start = int(self.line[15])
+        self.t_end = int(self.line[16])
+        self.block_count = int(self.line[17])
+        self.block_sizes = [int(x) for x in self.line[18].split(',') if x]
+        self.q_starts = [int(x) for x in self.line[19].split(',') if x]
+        self.t_starts = [int(x) for x in self.line[20].split(',') if x]
+
+    def get_query_coverage(self):
+        return (self.matches + self.mismatches + self.rep_matches) / self.q_size
+
+    def get_target_coverage(self):
+        return (self.matches + self.mismatches + self.rep_matches) / self.t_size
+
+    def get_identity(self):
+        return (self.matches + self.rep_matches) / (self.matches + self.mismatches + self.rep_matches)
+
+    def get_max_blocks(self):
+        return max(self.block_sizes)
+
+    def __str__(self):
+        return '\t'.join(self.line)
+
+    def get_blocks_count(self):
+        return self.block_count
+
+    def psl_score(self):
+        # my $pslScore = $sizeMul * ($matches + ( $repMatches >> 1) ) - $sizeMul * $misMatches - $qNumInsert - $tNumInsert;
+        return self.matches + (self.rep_matches / 2) - self.mismatches - self.q_num_insert - self.t_num_insert
+
+
+def parse_fasta(fasta_file):
+    fasta_dict = defaultdict(str)
+    with open(fasta_file, 'r') as f:
+        name = ""
+        sequence = ""
+        begun = False
+        for line in f:
+            if line.startswith(">"):
+                if begun:
+                    fasta_dict[name] = len(sequence)
+                    sequence = ""
+                name = line.strip().split(" ")[0].lstrip(">")
+                begun = True
+            else:
+                sequence += line.strip()
+        fasta_dict[name] = len(sequence)
+    return fasta_dict
+
 
 def main():
-    parser = argparse.ArgumentParser(description='filter the psl file (from blat output) to remove the alignments '
-                                                 'with low identity and coverage')
-    parser.add_argument('-i', '--input', help='input psl file', required=True)
-    parser.add_argument('-o', '--output', help='output psl file', required=True)
-    parser.add_argument('-q', '--q_cov', help='query coverage threshold', type=float, default=0.8)
-    parser.add_argument('-d', '--idty', help='identity threshold', type=float, default=0.8)
-    parser.add_argument('-b', '--nblocks', help='maximum number of blocks threshold', type=int, default=100)
-    args = parser.parse_args()
+    # create argument parser with subcommands filter, compare
+    parser = argparse.ArgumentParser(description='script to process PSL files')
+    subparsers = parser.add_subparsers(help='sub-command help', dest='command')
+    filter_parser = subparsers.add_parser('filter', help='filter psl file', description='filter psl file')
+    filter_parser.add_argument('-i', '--input', help='input psl file', required=True)
+    filter_parser.add_argument('-o', '--output', help='output psl file', required=True)
+    filter_parser.add_argument('-q', '--query_coverage', help='query coverage threshold', required=False, type=float, default=0.4)
+    filter_parser.add_argument('-t', '--target_coverage', help='target coverage threshold', required=False, type=float, default=0.4)
+    filter_parser.add_argument('-d', '--identity', help='identity threshold', required=False, type=float, default=0.9)
+    filter_parser.add_argument('-b', '--max_blocks', help='max blocks threshold', required=False, type=int, default=100)
+    filter_parser.add_argument('-x', '--query_fasta', help='query fasta file', required=False)
+    filter_parser.add_argument('-y', '--target_fasta', help='target fasta file', required=False)
 
-    with open(args.input, 'r') as f, open(args.output, 'w') as g:
-        # check if the file has header
+    best_hit_parser = subparsers.add_parser('best_hit', help='retain only the best hit from the PSL file', description='retain only the best hit from the PSL file')
+    best_hit_parser.add_argument('-i', '--input', help='input psl file', required=True)
+    best_hit_parser.add_argument('-o', '--output', help='output psl file', required=True)
+
+    args = parser.parse_args(args=None if sys.argv[1:] else ['--help'])
+
+    if args.command == 'filter':
+        query_fasta = None
+        target_fasta = None
+        if args.query_fasta:
+            query_fasta = parse_fasta(args.query_fasta)
+        if args.target_fasta:
+            target_fasta = parse_fasta(args.target_fasta)
+        filter_psl(args.input, args.output, args.query_coverage, args.identity, args.max_blocks, query_fasta, target_fasta)
+
+    if args.command == 'best_hit':
+        best_hit(args.input, args.output)
+
+
+def filter_psl(in_file, out_file, query_coverage, identity, max_blocks, query_fasta=None, target_fasta=None):
+    with open(in_file, 'r') as f, open(out_file, 'w') as g:
         for line in f:
-            line = line.strip().split('\t')
-            if len(line) < 21:
-                g.write('\t'.join(line) + '\n')
+            psl = PSL(line)
+            if psl.get_query_coverage() < query_coverage or psl.get_identity() < identity or psl.get_blocks_count() > max_blocks:
                 continue
-            aln_len = sum([int(i) for i in line[18].split(',')[:-1]])
-            q_cov = aln_len / int(line[10])
-            idty = int(line[0]) / int(line[10])
-            if q_cov <= args.q_cov:
-                continue
-            if idty <= args.idty:
-                continue
-            if int(line[17]) > args.nblocks:
-                continue
-            g.write('\t'.join(line) + '\n')
+            if query_fasta:
+                if psl.q_name not in query_fasta:
+                    continue
+            if target_fasta:
+                if psl.t_name not in target_fasta:
+                    continue
+            g.write(str(psl) + '\n')
 
+
+def best_hit(in_file, out_file):
+    prev_q_name = ""
+    psls = []
+    scores = []
+    with open(in_file, 'r') as f, open(out_file, 'w') as g, open(f"{out_file}.scores", 'w') as h:
+        for line in f:
+            psl = PSL(line)
+            if psl.q_name == psl.t_name:
+                continue
+            h.write(f"{str(psl)}\t{psl.psl_score()}\n")
+            if prev_q_name == psl.q_name:
+                psls.append(psl)
+                scores.append(psl.psl_score())
+            else:
+                if psls:
+                    max_score = max(scores)
+                    if scores.count(max_score) > 1:
+                        for i in range(len(scores)):
+                            if scores[i] == max_score:
+                                g.write(str(psls[i]) + '\n')
+                    else:
+                        g.write(str(psls[scores.index(max_score)]) + '\n')
+                psls = [psl]
+                scores = [psl.psl_score()]
+            prev_q_name = psl.q_name
 
 if __name__ == "__main__":
     main()
