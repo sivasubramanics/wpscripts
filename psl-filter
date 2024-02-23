@@ -93,6 +93,10 @@ def main():
     best_hit_parser.add_argument('-i', '--input', help='input psl file', required=True)
     best_hit_parser.add_argument('-o', '--output', help='output psl file', required=True)
 
+    sort_psl_parser = subparsers.add_parser('sort', help='sort the psl file', description='sort the psl file')
+    sort_psl_parser.add_argument('-i', '--input', help='input psl file', required=True)
+    sort_psl_parser.add_argument('-o', '--output', help='output psl file', required=True)
+
     args = parser.parse_args(args=None if sys.argv[1:] else ['--help'])
 
     if args.command == 'filter':
@@ -106,6 +110,9 @@ def main():
 
     if args.command == 'best_hit':
         best_hit(args.input, args.output)
+
+    if args.command == 'sort':
+        sort_psl(args.input, args.output)
 
 
 def filter_psl(in_file, out_file, query_coverage, identity, max_blocks, query_fasta=None, target_fasta=None):
@@ -149,5 +156,37 @@ def best_hit(in_file, out_file):
                 scores = [psl.psl_score()]
             prev_q_name = psl.q_name
 
+
+def sort_psl(input, output):
+    prev_q_name = ""
+    psls = []
+    scores = []
+    with open(input, 'r') as f, open(output, 'w') as g:
+        for line in f:
+            psl = PSL(line)
+            if prev_q_name == psl.q_name:
+                psls.append(psl)
+                scores.append(psl.psl_score())
+            else:
+                if psls:
+                    psls = sort_lists(psls, scores)
+                    for p in psls:
+                        g.write(f"{str(p)}\t{p.psl_score()}\n")
+                psls = [psl]
+                scores = [psl.psl_score()]
+            prev_q_name = psl.q_name
+
+
+def sort_lists(list_a, list_b):
+    # Combine the two lists into tuples
+    combined = zip(list_a, list_b)
+
+    #Reverse Sort the combined list based on the scores (second element of each tuple)
+    sorted_combined = sorted(combined, key=lambda x: x[1], reverse=True)
+
+    # Extract the rearranged list_a
+    rearranged_list_a = [item[0] for item in sorted_combined]
+
+    return rearranged_list_a
 if __name__ == "__main__":
     main()
