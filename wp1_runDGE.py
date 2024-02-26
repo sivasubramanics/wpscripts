@@ -131,7 +131,13 @@ if __name__ == "__main__":
 
     # read the count matrix
     count_df = pd.read_csv(in_matrix, sep = "\t")
-    count_df.rename(columns = {count_df.columns[0]:'trans_id'}, inplace = True) 
+    count_df.rename(columns = {count_df.columns[0]:'trans_id'}, inplace = True)
+
+    # remove samples from samples for not present in count_df
+    for sample in samples:
+        if sample not in count_df.columns:
+            samples.remove(sample)
+            print(f"{sample} not found in the count matrix. Removing it from the samples list")
 
     # choose the output file header based on the dge method
     ofh = open(out_file, 'w')
