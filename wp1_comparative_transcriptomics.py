@@ -419,8 +419,8 @@ class OrthogroupsParser(object):
             diff_dict = defaultdict(lambda: defaultdict(float))
             for sample in deg_dict[reference]:
                 fo = open(f"{out_prefix}.{reference}_{sample}.orthogroups.summary.tsv", 'w')
-                fo.write(f"Orthogroup\tnum_attributes\tnum_deg\tnum_up\tnum_down\tratio_deg\tratio_up\tattributes"
-                         f"\tratio_down\tdiff")
+                fo.write(f"Orthogroup\tnum_attributes\tnum_deg\tnum_up\tnum_down\tratio_deg\tratio_up"
+                         f"\tratio_down\tdiff\tattributes")
                 if self.annotation_dict is not None:
                     fo.write(f"\t{ANNOTATION_HEAD}\n")
                 else:
@@ -467,9 +467,10 @@ class OrthogroupsParser(object):
             fr.write(f"Orthogroup")
             for sample in deg_dict[reference]:
                 fr.write(f"\t{sample}")
-            fr.write("\n")
             if self.orthogroups_annotations is not None:
-                fr.write(f"{ANNOTATION_HEAD}\n")
+                fr.write(f"\t{ANNOTATION_HEAD}\n")
+            else:
+                fr.write("\n")
             for orthogroup in diff_dict:
                 fr.write(f"{orthogroup}")
                 for sample in deg_dict[reference]:
