@@ -34,7 +34,8 @@ def main():
                 continue
             if prev != line[0] or prev == None:
                 pantr_count += 1
-                pantr = 'PanTR_' + str(pantr_count)       
+                # pantr = 'PanTR_' + str(pantr_count)
+                pantr = line[0]
             if pantr not in pan_map:
                 pan_map[pantr] = []
             pan_map[pantr].append(line[1])
