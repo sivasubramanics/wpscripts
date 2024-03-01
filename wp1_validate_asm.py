@@ -75,6 +75,8 @@ def main():
     parser = argparse.ArgumentParser(description='Validate the assembly based on the mapping with reference transcripts')
     parser.add_argument('-i', '--input', help='input psl file', required=True)
     parser.add_argument('-o', '--outdir', help='output directory', required=True)
+    parser.add_argument('-t', '--t_cov', help='target coverage threshold', type=int, default=80)
+    parser.add_argument('-q', '--q_cov', help='query coverage threshold', type=int, default=80)
     args = parser.parse_args()
 
     # create output directory if not exists
@@ -105,7 +107,7 @@ def main():
     get_coverage_summary(best_hit_tsv, 'target')
     get_coverage_summary(best_hit_tsv, 'query')
 
-    complete_asm(best_hit_tsv, 80, 80)
+    complete_asm(best_hit_tsv, args.t_cov, args.q_cov)
 
 
 def get_coverage_summary(best_hit_tsv, coverage_type):
