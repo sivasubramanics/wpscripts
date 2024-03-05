@@ -380,7 +380,7 @@ def get_seq_lengths(length_file):
     return chr_lengths
 
 
-def find_IBS(input_file, output_file, min_variations, min_score, min_consecutive):
+def find_IBS(input_file, output_file, min_variations, min_score, min_consecutive, reverse=False):
     """
     Flag the IBS regions in kcf file
     """
@@ -392,36 +392,192 @@ def find_IBS(input_file, output_file, min_variations, min_score, min_consecutive
         last_chrom = None
         first_block = True
         for key in windows:
-            if key[0] != last_chrom and last_chrom is not None:
-                first_block = True
-                block_num += 1
-                na_num = 0
-            if windows[key].data[sample].score >= min_score:
-                if first_block:
+            if not reverse:
+                if key[0] != last_chrom and last_chrom is not None:
+                    first_block = True
                     block_num += 1
-                if na_num > min_consecutive:
-                    block_num += 1
-                na_num = 0
-                windows[key].data[sample].ibs = str(block_num)
-            elif windows[key].data[sample].va <= min_variations and windows[key].data[sample].score >= 0.5:
-                if first_block:
-                    block_num += 1
-                if na_num > min_consecutive:
-                    block_num += 1
-                na_num = 0
-                windows[key].data[sample].ibs = str(block_num)
+                    na_num = 0
+                if windows[key].data[sample].score >= min_score:
+                    if first_block:
+                        block_num += 1
+                    if na_num > min_consecutive:
+                        block_num += 1
+                    na_num = 0
+                    windows[key].data[sample].ibs = str(block_num)
+                elif windows[key].data[sample].va <= min_variations and windows[key].data[sample].score >= 0.5:
+                    if first_block:
+                        block_num += 1
+                    if na_num > min_consecutive:
+                        block_num += 1
+                    na_num = 0
+                    windows[key].data[sample].ibs = str(block_num)
+                else:
+                    windows[key].data[sample].ibs = 'N'
+                    na_num += 1
+                last_chrom = key[0]
+                first_block = False
             else:
-                windows[key].data[sample].ibs = 'N'
-                na_num += 1
-            last_chrom = key[0]
-            first_block = False
+                if key[0] != last_chrom and last_chrom is not None:
+                    first_block = True
+                    block_num += 1
+                    na_num = 0
+                if windows[key].data[sample].score <= min_score:
+                    if first_block:
+                        block_num += 1
+                    if na_num > min_consecutive:
+                        block_num += 1
+                    na_num = 0
+                    windows[key].data[sample].ibs = str(block_num)
+                elif windows[key].data[sample].va >= min_variations and windows[key].data[sample].score <= 0.5:
+                    if first_block:
+                        block_num += 1
+                    if na_num > min_consecutive:
+                        block_num += 1
+                    na_num = 0
+                    windows[key].data[sample].ibs = str(block_num)
+                else:
+                    windows[key].data[sample].ibs = 'N'
+                    na_num += 1
+                last_chrom = key[0]
+                first_block = False
     write_kcf(output_file, windows, samples, misc_lines)
 
 
-def extract(input_file, output_prefix, sample_name=None):
-    """
-    Extract windows from kcf file
-    """
+# def extract(input_file, output_prefix, sample_name=None, heatmap=False):
+#     """
+#     Extract windows from kcf file
+#     """
+#     windows, samples, misc_lines = read_kcf(input_file)
+#     print_log(f'Extracting windows from {input_file}')
+#     if sample_name is not None:
+#         if type(sample_name) == str:
+#             samples = [sample_name]
+#         elif type(sample_name) == list:
+#             samples = sample_name
+#
+#     for sample in samples:
+#         output_file = f'{output_prefix}.{sample}.tsv'
+#         fo = open(output_file, 'w')
+#         fo.write(f'seqname\tstart\tend\tlength\ttotal_blocks\tibs_blocks\tmean_score\n')
+#         out_bed = f'{output_prefix}.{sample}.bed'
+#         fo_bed = open(out_bed, 'w')
+#         last_block_num = 0
+#         block_count = 0
+#         block_start = None
+#         na_num = 0
+#         all_num = 0
+#         ibs_score = 0
+#         na_score = 0
+#         last_chrom = None
+#         for (seqname, start, end) in windows:
+#             block_num = windows[(seqname, start, end)].data[sample].ibs
+#             if seqname != last_chrom and last_chrom is not None:
+#                 block_num = 'N'
+#                 na_score = 0
+#                 ibs_score = 0
+#                 block_count = 0
+#                 block_start = None
+#                 na_num = 0
+#                 all_num = 0
+#             last_chrom = seqname
+#             all_num += 1
+#             if block_num == 'N':
+#                 na_score += windows[(seqname, start, end)].data[sample].score
+#                 na_num += 1
+#                 continue
+#             else:
+#                 ibs_score += windows[(seqname, start, end)].data[sample].score
+#                 if na_score > 0:
+#                     ibs_score += na_score
+#                     old_na_score = na_score
+#                     na_score = 0
+#
+#             if block_num != last_block_num:
+#                 if block_start is not None:
+#                     ibs_score = round((ibs_score - old_na_score - windows[(seqname, start, end)].data[sample].score) / (all_num - na_num - 1), 2)
+#                     fo.write(
+#                         f'{seqname}\t{block_start}\t{block_end}\t{block_end - block_start}\t{all_num - na_num - 1}\t{block_count}\t{ibs_score}\n')
+#                     fo_bed.write(f'{seqname}\t{block_start}\t{block_end}\t0\t+\n')
+#                 ibs_score = windows[(seqname, start, end)].data[sample].score
+#                 na_score = 0
+#                 block_count = 0
+#                 block_start = start
+#                 all_num = 1
+#             na_num = 0
+#             last_block_num = block_num
+#             block_end = end
+#             block_count += 1
+#         if block_num == 'N':
+#             print(f'{seqname}\t{block_start}\t{block_end}\t{block_end - block_start}\t{all_num - na_num}\t{block_count}\t{ibs_score}\n')
+#             ibs_score = round((ibs_score - na_score) / (all_num - na_num), 2)
+#         else:
+#             ibs_score = round(ibs_score / all_num, 2)
+#         fo.write(
+#             f'{seqname}\t{block_start}\t{block_end}\t{block_end - block_start}\t{all_num - na_num}\t{block_count}\t{ibs_score}\n')
+#         fo_bed.write(f'{seqname}\t{block_start}\t{block_end}\t0\t+\n')
+#         fo.close()
+#
+#     if heatmap:
+#         prev_chrom = None
+#         num_window = 0
+#         for key in windows:
+#             chrom = key[0]
+#             num_window += 1
+#             if chrom != prev_chrom:
+#                 if prev_chrom is not None:
+#                     fo.close()
+#                 num_window = 1
+#                 fo = open(f'{output_prefix}.{chrom}.heatmap.tsv', 'w')
+#                 samples_line = '\t'.join(samples)
+#                 fo.write(f'window\t{samples_line}\n')
+#             ibs = "\t".join(map(ibs_to_binary, windows[key].get_value('IB', samples)))
+#             fo.write(f'{num_window}\t{ibs}\n')
+#             prev_chrom = chrom
+#         fo.close()
+
+
+class IBS:
+    def __init__(self, seqname):
+        self.seqname = seqname
+        self.starts = []
+        self.ends = []
+        self.scores = []
+        self.is_ibs = []
+
+    def add_window(self, start, end, score, is_ibs):
+        self.starts.append(start)
+        self.ends.append(end)
+        self.scores.append(score)
+        self.is_ibs.append(is_ibs)
+
+    def remove_tail_na(self):
+        # remove the tailing False from the list of is_ibs
+        # count number of False from the end of the list
+        tail_na_count = 0
+        for is_ibs in reversed(self.is_ibs):
+            if is_ibs:
+                break
+            tail_na_count += 1
+        if tail_na_count == 0:
+            return
+        self.starts = self.starts[:-tail_na_count]
+        self.ends = self.ends[:-tail_na_count]
+        self.scores = self.scores[:-tail_na_count]
+        self.is_ibs = self.is_ibs[:-tail_na_count]
+
+    def __str__(self):
+        self.remove_tail_na()
+        return (f'{self.seqname}'
+                f'\t{self.starts[0]}'
+                f'\t{self.ends[-1]}'
+                f'\t{self.ends[-1]-self.starts[0]}'
+                f'\t{len(self.starts)}'
+                f'\t{len([x for x in self.is_ibs if x])}'
+                f'\t{round(sum(self.scores) / len(self.scores), 2)}')
+
+
+def extract(input_file, output_prefix, sample_name=None, heatmap=False):
+
     windows, samples, misc_lines = read_kcf(input_file)
     print_log(f'Extracting windows from {input_file}')
     if sample_name is not None:
@@ -433,53 +589,50 @@ def extract(input_file, output_prefix, sample_name=None):
     for sample in samples:
         output_file = f'{output_prefix}.{sample}.tsv'
         fo = open(output_file, 'w')
-        fo.write(f'seqname\tstart\tend\tlength\ttotal_blocks\tibs_blocks\n')
+        fo.write(f'id\tseqname\tstart\tend\tlength\ttotal_blocks\tibs_blocks\tmean_score\n')
         out_bed = f'{output_prefix}.{sample}.bed'
         fo_bed = open(out_bed, 'w')
-        last_block_num = 0
-        block_count = 0
-        block_start = None
-        na_num = 0
-        all_num = 0
+
+        blocks = defaultdict()
+        last_num = None
         for (seqname, start, end) in windows:
             block_num = windows[(seqname, start, end)].data[sample].ibs
-            all_num += 1
             if block_num == 'N':
-                na_num += 1
-                continue
-            if block_num != last_block_num:
-                if block_start is not None:
-                    fo.write(
-                        f'{seqname}\t{block_start}\t{block_end}\t{block_end - block_start}\t{all_num - na_num - 1}\t{block_count}\n')
-                    fo_bed.write(f'{seqname}\t{block_start}\t{block_end}\t0\t+\n')
-                block_count = 0
-                block_start = start
-                all_num = 1
-            na_num = 0
-            last_block_num = block_num
-            block_end = end
-            block_count += 1
-        fo.write(
-            f'{seqname}\t{block_start}\t{block_end}\t{block_end - block_start}\t{all_num - na_num}\t{block_count}\n')
-        fo_bed.write(f'{seqname}\t{block_start}\t{block_end}\t0\t+\n')
+                is_ibs = False
+                if last_num is not None:
+                    blocks[last_num].add_window(start, end, windows[(seqname, start, end)].data[sample].score, is_ibs)
+            else:
+                is_ibs = True
+                if block_num not in blocks:
+                    blocks[block_num] = IBS(seqname)
+                blocks[block_num].add_window(start, end, windows[(seqname, start, end)].data[sample].score, is_ibs)
+                last_num = block_num
+
+        for block_num in blocks:
+            fo.write(f'{block_num}\t{blocks[block_num]}\n')
+            for i in range(len(blocks[block_num].starts)):
+                fo_bed.write(f'{blocks[block_num].seqname}\t{blocks[block_num].starts[i]}\t{blocks[block_num].ends[i]}\t0\t+\n')
+
+    if heatmap:
+        prev_chrom = None
+        num_window = 0
+        for key in windows:
+            chrom = key[0]
+            num_window += 1
+            if chrom != prev_chrom:
+                if prev_chrom is not None:
+                    fo.close()
+                num_window = 1
+                fo = open(f'{output_prefix}.{chrom}.heatmap.tsv', 'w')
+                samples_line = '\t'.join(samples)
+                fo.write(f'window\t{samples_line}\n')
+            ibs = "\t".join(map(ibs_to_binary, windows[key].get_value('IB', samples)))
+            fo.write(f'{num_window}\t{ibs}\n')
+            prev_chrom = chrom
         fo.close()
 
-    prev_chrom = None
-    num_window = 0
-    for key in windows:
-        chrom = key[0]
-        num_window += 1
-        if chrom != prev_chrom:
-            if prev_chrom is not None:
-                fo.close()
-            num_window = 1
-            fo = open(f'{output_prefix}.{chrom}.heatmap.tsv', 'w')
-            samples_line = '\t'.join(samples)
-            fo.write(f'window\t{samples_line}\n')
-        ibs = "\t".join(map(ibs_to_binary, windows[key].get_value('IB', samples)))
-        fo.write(f'{num_window}\t{ibs}\n')
-        prev_chrom = chrom
-    fo.close()
+
+
 
 
 def kcf2bedgraph(input_file, output_prefix, sample_name=None):
@@ -876,6 +1029,7 @@ def main():
     parser_find_IBS.add_argument('-s', '--score', help='Minimum score cut-off', default=0.8, type=float)
     parser_find_IBS.add_argument('-c', '--consecutive',
                                  help='Minimum consecutive windows with NA\'s', default=5, type=int)
+    parser_find_IBS.add_argument('-r', '--reverse', help='set this if the IBS to be detected on contrast', action='store_true', default=False)
 
     # Create the parser for the "extract" command
     parser_extract = subparsers.add_parser('extract', help='Step 4: Extract windows from kcf file')
@@ -883,6 +1037,7 @@ def main():
     parser_extract.add_argument('-o', '--output', help='Output prefix', required=True)
     parser_extract.add_argument('-s', '--sample',
                                 help='Sample name (if not given, will be taken from input file name)')
+    parser_extract.add_argument('-H', '--heatmap', help='Output heatmap file', action='store_true', default=False)
 
     # Create the parser for the "bedgraph" command
     parser_bedgraph = subparsers.add_parser('kcf2bedgraph', help='Step 5: Convert kcf file to bedgraph files')
@@ -941,9 +1096,9 @@ def main():
     elif args.command == 'increase_window':
         increase_window(args.input, args.output, args.window, args.kmer, args.length)
     elif args.command == 'find_IBS':
-        find_IBS(args.input, args.output, args.variations, args.score, args.consecutive)
+        find_IBS(args.input, args.output, args.variations, args.score, args.consecutive, args.reverse)
     elif args.command == 'extract':
-        extract(args.input, args.output, args.sample)
+        extract(args.input, args.output, args.sample, args.heatmap)
     elif args.command == 'kcf2bedgraph':
         kcf2bedgraph(args.input, args.output, args.sample)
     elif args.command == 'kcf2matrix':
