@@ -38,12 +38,12 @@ class Data:
     @property
     def score(self):
         if self.tot == 0:
-            return 0.00
+            return 0.0000
         if self.ob == 0:
-            return 0.00
-        _score = round((self.ob - self.va) / self.tot, 2)
-        if _score < 0.001:
-            return 0.00
+            return 0.0000
+        _score = round((self.ob - self.va) / self.tot, 4)
+        if _score < 0.0001:
+            return 0.0000
         return _score
 
     def __str__(self):
@@ -428,7 +428,7 @@ def find_IBS(input_file, output_file, min_variations, min_score, min_consecutive
                         block_num += 1
                     na_num = 0
                     windows[key].data[sample].ibs = str(block_num)
-                elif windows[key].data[sample].va >= min_variations and windows[key].data[sample].score <= 0.5:
+                elif windows[key].data[sample].va >= min_variations and windows[key].data[sample].score <= 0.2:
                     if first_block:
                         block_num += 1
                     if na_num > min_consecutive:
@@ -441,99 +441,6 @@ def find_IBS(input_file, output_file, min_variations, min_score, min_consecutive
                 last_chrom = key[0]
                 first_block = False
     write_kcf(output_file, windows, samples, misc_lines)
-
-
-# def extract(input_file, output_prefix, sample_name=None, heatmap=False):
-#     """
-#     Extract windows from kcf file
-#     """
-#     windows, samples, misc_lines = read_kcf(input_file)
-#     print_log(f'Extracting windows from {input_file}')
-#     if sample_name is not None:
-#         if type(sample_name) == str:
-#             samples = [sample_name]
-#         elif type(sample_name) == list:
-#             samples = sample_name
-#
-#     for sample in samples:
-#         output_file = f'{output_prefix}.{sample}.tsv'
-#         fo = open(output_file, 'w')
-#         fo.write(f'seqname\tstart\tend\tlength\ttotal_blocks\tibs_blocks\tmean_score\n')
-#         out_bed = f'{output_prefix}.{sample}.bed'
-#         fo_bed = open(out_bed, 'w')
-#         last_block_num = 0
-#         block_count = 0
-#         block_start = None
-#         na_num = 0
-#         all_num = 0
-#         ibs_score = 0
-#         na_score = 0
-#         last_chrom = None
-#         for (seqname, start, end) in windows:
-#             block_num = windows[(seqname, start, end)].data[sample].ibs
-#             if seqname != last_chrom and last_chrom is not None:
-#                 block_num = 'N'
-#                 na_score = 0
-#                 ibs_score = 0
-#                 block_count = 0
-#                 block_start = None
-#                 na_num = 0
-#                 all_num = 0
-#             last_chrom = seqname
-#             all_num += 1
-#             if block_num == 'N':
-#                 na_score += windows[(seqname, start, end)].data[sample].score
-#                 na_num += 1
-#                 continue
-#             else:
-#                 ibs_score += windows[(seqname, start, end)].data[sample].score
-#                 if na_score > 0:
-#                     ibs_score += na_score
-#                     old_na_score = na_score
-#                     na_score = 0
-#
-#             if block_num != last_block_num:
-#                 if block_start is not None:
-#                     ibs_score = round((ibs_score - old_na_score - windows[(seqname, start, end)].data[sample].score) / (all_num - na_num - 1), 2)
-#                     fo.write(
-#                         f'{seqname}\t{block_start}\t{block_end}\t{block_end - block_start}\t{all_num - na_num - 1}\t{block_count}\t{ibs_score}\n')
-#                     fo_bed.write(f'{seqname}\t{block_start}\t{block_end}\t0\t+\n')
-#                 ibs_score = windows[(seqname, start, end)].data[sample].score
-#                 na_score = 0
-#                 block_count = 0
-#                 block_start = start
-#                 all_num = 1
-#             na_num = 0
-#             last_block_num = block_num
-#             block_end = end
-#             block_count += 1
-#         if block_num == 'N':
-#             print(f'{seqname}\t{block_start}\t{block_end}\t{block_end - block_start}\t{all_num - na_num}\t{block_count}\t{ibs_score}\n')
-#             ibs_score = round((ibs_score - na_score) / (all_num - na_num), 2)
-#         else:
-#             ibs_score = round(ibs_score / all_num, 2)
-#         fo.write(
-#             f'{seqname}\t{block_start}\t{block_end}\t{block_end - block_start}\t{all_num - na_num}\t{block_count}\t{ibs_score}\n')
-#         fo_bed.write(f'{seqname}\t{block_start}\t{block_end}\t0\t+\n')
-#         fo.close()
-#
-#     if heatmap:
-#         prev_chrom = None
-#         num_window = 0
-#         for key in windows:
-#             chrom = key[0]
-#             num_window += 1
-#             if chrom != prev_chrom:
-#                 if prev_chrom is not None:
-#                     fo.close()
-#                 num_window = 1
-#                 fo = open(f'{output_prefix}.{chrom}.heatmap.tsv', 'w')
-#                 samples_line = '\t'.join(samples)
-#                 fo.write(f'window\t{samples_line}\n')
-#             ibs = "\t".join(map(ibs_to_binary, windows[key].get_value('IB', samples)))
-#             fo.write(f'{num_window}\t{ibs}\n')
-#             prev_chrom = chrom
-#         fo.close()
 
 
 class IBS:
@@ -630,9 +537,6 @@ def extract(input_file, output_prefix, sample_name=None, heatmap=False):
             fo.write(f'{num_window}\t{ibs}\n')
             prev_chrom = chrom
         fo.close()
-
-
-
 
 
 def kcf2bedgraph(input_file, output_prefix, sample_name=None):
@@ -753,6 +657,7 @@ def transpose_gt_matrix(input_file, output_file):
             # Write the column as a row in the output file
             writer.writerow(column)
 
+
 def transpose_matrix(in_file, out_file):
     """
     Transpose matrix
@@ -803,6 +708,7 @@ def kcf2matrix(ikcf, outprefix, sample, allele_a_cutoff, allele_b_cutoff):
     # transpose_gt_matrix(f"{outprefix}.matrix.tr.tsv", f"{outprefix}.matrix.tsv")
     transpose_matrix(f"{outprefix}.matrix.tr.tsv", f"{outprefix}.matrix.tsv")
     convert_tsv2RData(f"{outprefix}.matrix.tsv", f"{outprefix}.map.tsv")
+
 
 def list_to_str(in_list, sep='\t'):
     """
@@ -992,6 +898,118 @@ def get_attributes(input, output, attribute, samples=None):
     fo.close()
 
 
+def extract_score_matrix(input, output, length, min_length, score_cutoff, reverse=False, ibs_prop=0.5):
+    """
+    Extract score matrix from IBS TSv files
+    """
+    len_dict = defaultdict()
+    with open(length, 'r') as f:
+        for line in f:
+            line = line.strip().split('\t')
+            len_dict[line[0]] = int(line[1])
+
+    data_dict = defaultdict()
+    with open(input, 'r') as f:
+        for line in f:
+            line = line.strip().split('\t')
+            # check if file exits or accessible
+            if not os.path.isfile(line[1]):
+                print_log(f'Error: {line[1]} not found or not accessible. skipping')
+                continue
+            data_dict[line[0]] = line[1]
+
+    samples = list(data_dict.keys())
+    print_log(f'Total samples: {len(samples)}')
+
+    out_matrix = defaultdict()
+    for seqname in len_dict:
+        for i in range(0, len_dict[seqname], 500000):
+            win = int(i / 500000) * 0.5
+            out_matrix[(seqname, win)] = [0] * len(samples)
+
+    for sample in samples:
+        print_log(f'Processing {sample}')
+        with open(data_dict[sample], 'r') as f:
+            for line in f:
+                line = line.strip().split('\t')
+                if line[0] == 'id':
+                    continue
+                if float(line[4]) < min_length:
+                    continue
+                window_start = int(float(line[2]) / 500000)
+                window_end = int(float(line[3]) / 500000)
+                if float(line[6])/float(line[5]) < ibs_prop:
+                    continue
+                if reverse:
+                    if float(line[7]) <= score_cutoff:
+                        for i in range(window_start, window_end+1):
+                            out_matrix[(line[1], i*0.5)][samples.index(sample)] = line[7]
+                else:
+                    if float(line[7]) >= score_cutoff:
+                        for i in range(window_start, window_end+1):
+                            out_matrix[(line[1], i*0.5)][samples.index(sample)] = line[7]
+
+    with open(output, 'w') as f:
+        f.write('seqname\tstart\t' + '\t'.join(samples) + '\n')
+        for key in out_matrix:
+            f.write(f'{key[0]}\t{key[1]}\t' + '\t'.join(map(str, out_matrix[key])) + '\n')
+
+
+def count_genes(input, output, gtf, feature, score_cutoff, reverse=False, ibs_prop=0.5, min_length=0):
+    """
+    Count the number genes per block
+    """
+    print_log(f'Counting genes in {input}')
+    genes = defaultdict()
+    with open(gtf, 'r') as f:
+        for line in f:
+            if line.startswith('#'):
+                continue
+            line = line.strip().split('\t')
+            if line[0] not in genes:
+                genes[line[0]] = defaultdict()
+            if line[2] == feature:
+                if line[3] not in genes[line[0]]:
+                    genes[line[0]][line[3]] = []
+                genes[line[0]][line[3]].append(float(line[4])-float(line[3]))
+
+    with open(input, 'r') as fi, open(output, 'w') as fo:
+        for line in fi:
+            line = line.strip().split('\t')
+            if line[2] == 'seqname':
+                line = '\t'.join(line)
+                fo.write(f"{line}\tn_genes\n")
+                continue
+            n_genes = 0
+            if float(line[4]) - float(line[3]) < min_length:
+                continue
+            if float(line[7])/float(line[6]) < ibs_prop:
+                continue
+            if reverse:
+                if float(line[8]) > score_cutoff:
+                    continue
+            else:
+                if float(line[8]) < score_cutoff:
+                    continue
+
+            if line[2] in genes:
+                for g_start in genes[line[2]]:
+                    for len in genes[line[2]][g_start]:
+                        if float(g_start) >= float(line[3]) and float(g_start)+len <= float(line[4]):
+                            n_genes += 1
+            line = '\t'.join(line)
+            fo.write(f"{line}\t{n_genes}\n")
+
+
+def recalculate(in_kcf, out_kcf):
+    """
+    Recalculate the scores in kcf file
+    """
+    windows, samples, misc_lines = read_kcf(in_kcf)
+    write_kcf(out_kcf, windows, samples, misc_lines)
+
+
+
 def main():
     # start the clock
     start_time = time.time()
@@ -1025,10 +1043,10 @@ def main():
     parser_find_IBS = subparsers.add_parser('find_IBS', help='Step 3: Find the IBS regions in kcf file')
     parser_find_IBS.add_argument('-i', '--input', help='Input kcf file', required=True)
     parser_find_IBS.add_argument('-o', '--output', help='Output kcf file', required=True)
-    parser_find_IBS.add_argument('-v', '--variations', help='Minimum variations cut-off', default=6, type=float)
-    parser_find_IBS.add_argument('-s', '--score', help='Minimum score cut-off', default=0.8, type=float)
+    parser_find_IBS.add_argument('-v', '--variations', help='Minimum variations cut-off. [default: 6] ', default=6, type=float)
+    parser_find_IBS.add_argument('-s', '--score', help='Minimum score cut-off. [default: 0.8]', default=0.8, type=float)
     parser_find_IBS.add_argument('-c', '--consecutive',
-                                 help='Minimum consecutive windows with NA\'s', default=5, type=int)
+                                 help='Minimum consecutive windows with NA\'s [default: 5]', default=5, type=int)
     parser_find_IBS.add_argument('-r', '--reverse', help='set this if the IBS to be detected on contrast', action='store_true', default=False)
 
     # Create the parser for the "extract" command
@@ -1052,10 +1070,8 @@ def main():
     parser_kcf2matrix.add_argument('-o', '--output', help='Output prefix', required=True)
     parser_kcf2matrix.add_argument('-s', '--sample',
                                    help='Sample name (if not given, will be taken from input file name)')
-    parser_kcf2matrix.add_argument('-a', '--allele_a_cutoff', help='Allele A cutoff', default=0.8, type=float)
-    parser_kcf2matrix.add_argument('-b', '--allele_b_cutoff', help='Allele B cutoff', default=0.2, type=float)
-
-
+    parser_kcf2matrix.add_argument('-a', '--allele_a_cutoff', help='Allele A cutoff [default: 0.8]', default=0.8, type=float)
+    parser_kcf2matrix.add_argument('-b', '--allele_b_cutoff', help='Allele B cutoff [default: 0.2]', default=0.2, type=float)
 
     # Create the parser for the "split_kcf" command
     parser_split_kcf = subparsers.add_parser('split_kcf', help='Misc: Split kcf file by chromosome')
@@ -1086,6 +1102,29 @@ def main():
     parser_get_scores.add_argument('-s', '--sample',
                                    help='Sample name (if not given, will be taken from input file name)', nargs='+', default=None)
     parser_get_scores.add_argument('-S', '--samples_list', help='File containing list of samples to be extracted', default=None)
+
+    parser_extract_score_matrix = subparsers.add_parser('extract_score_matrix', help='Misc: Extract score matrix from ibs.tsv files (output of extract step)')
+    parser_extract_score_matrix.add_argument('-i', '--input', help='TSV file with label and ibs.tsv file', required=True)
+    parser_extract_score_matrix.add_argument('-o', '--output', help='Output file', required=True)
+    parser_extract_score_matrix.add_argument('-l', '--length', help='genome length file (.fai file)', required=True)
+    parser_extract_score_matrix.add_argument('-m', '--min_len', help='minimum length to filter', default=1000000, type=int)
+    parser_extract_score_matrix.add_argument('-s', '--score', help='minimum score to filter. [default: 0.8]', default=0.8, type=float)
+    parser_extract_score_matrix.add_argument('-r', '--reverse', help='set this if the IBS to be detected on contrast', action='store_true', default=False)
+    parser_extract_score_matrix.add_argument('-p', '--ibs_prop', help='minimum IBS blocks proportion to filter. [default: 0.5]', default=0.5, type=float)
+
+    parser_count_genes = subparsers.add_parser('count_genes', help='Misc: Count genes in the IBS blocks')
+    parser_count_genes.add_argument('-i', '--input', help='Input TSV file from extract step', required=True)
+    parser_count_genes.add_argument('-o', '--output', help='Output file', required=True)
+    parser_count_genes.add_argument('-g', '--gtf', help='GTF file', required=True)
+    parser_count_genes.add_argument('-f', '--feature', help='Feature to be counted', default='gene')
+    parser_count_genes.add_argument('-s', '--score', help='minimum score to filter. [default: 0.8]', default=0.8, type=float)
+    parser_count_genes.add_argument('-r', '--reverse', help='set this if the IBS to be detected on contrast', action='store_true', default=False)
+    parser_count_genes.add_argument('-p', '--ibs_prop', help='minimum IBS blocks proportion to filter. [default: 0.5]', default=0.5, type=float)
+    parser_count_genes.add_argument('-m', '--min_length', help='minimum length to filter', default=10000, type=int)
+
+    parse_recalculate = subparsers.add_parser('recalculate', help='Misc: Recalculate the scores')
+    parse_recalculate.add_argument('-i', '--input', help='Input kcf file', required=True)
+    parse_recalculate.add_argument('-o', '--output', help='Output kcf file', required=True)
 
     args = parser.parse_args(args=(sys.argv[1:] or ['--help']))
 
@@ -1128,6 +1167,12 @@ def main():
         else:
             samples = args.sample
         get_attributes(args.input, args.output, args.attribute, samples)
+    elif args.command == 'extract_score_matrix':
+        extract_score_matrix(args.input, args.output, args.length, args.min_len, args.score, args.reverse, args.ibs_prop)
+    elif args.command == 'count_genes':
+        count_genes(args.input, args.output, args.gtf, args.feature, args.score, args.reverse, args.ibs_prop, args.min_length)
+    elif args.command == 'recalculate':
+        recalculate(args.input, args.output)
     else:
         parser.print_help()
         sys.exit(1)
