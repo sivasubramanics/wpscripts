@@ -77,13 +77,21 @@ def main():
     parser = argparse.ArgumentParser(description='Rename isoforms in a fasta file')
     parser.add_argument('-f', '--fasta', help='input fasta file', required=True)
     parser.add_argument('-p', '--prefix', help='prefix to add to fasta headers', required=True)
-    parser.add_argument('-o', '--output', help='output fasta file', required=True)
+    parser.add_argument('-o', '--output', help='output file prefix', required=True)
     parser.add_argument('-t', '--type', help='assembly type', choices=['trinity', 'rnaspades', 'fasta', 'evigene'], required=True)
+    parser.add_argument('-a', '--protein', help='proteins fasta file', required=False)
     args = parser.parse_args()
 
-    fo = open(args.output, 'w')
-    fm = open(args.output + '.map', 'w')
-    fgtr = open(args.output + '.gene_to_transcript.map', 'w')
+    if args.protein:
+        prot_dict = defaultdict()
+        for prot in parse_fasta(args.protein):
+            prot_dict[prot.name] = prot
+
+    fo = open(f"{args.output}.fasta", 'w')
+    fm = open(f"{args.output}.map", 'w')
+    fgtr = open(f"{args.output}.gene_to_transcript.map", 'w')
+    if args.protein:
+        fp = open(f"{args.output}.faa", 'w')
     genes = defaultdict(list)
     n_genes = 0
     for fasta in parse_fasta(args.fasta):
@@ -100,6 +108,12 @@ def main():
         fasta.name = new_isoforms_name
         fo.write(f"{str(fasta)}\n")
         fgtr.write(f"{new_gene_name}\t{new_isoforms_name}\n")
+        if args.protein:
+            if t_id in prot_dict:
+                prot_dict[t_id].name = new_isoforms_name
+                fp.write(f"{str(prot_dict[t_id])}\n")
+            else:
+                print(f"Protein {t_id} not found in protein fasta file", file=sys.stderr)
 
 
 if __name__ == '__main__':
