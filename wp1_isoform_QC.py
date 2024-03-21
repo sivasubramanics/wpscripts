@@ -284,9 +284,9 @@ def prepare_db(db_dir, dbname, threads, taxids=None) -> None:
         sys.exit(1)
 
     # extract fasta headers from the uniref90 fasta file
-    if not os.path.exists(unireftaxon):
-        no_seqs = get_headers(unireffile)
-        logging.info(f"Extracting sequence headers complete. Number of sequences: {no_seqs}")
+    # if not os.path.exists(unireftaxon):
+    #     no_seqs = get_headers(unireffile)
+    #     logging.info(f"Extracting sequence headers complete. Number of sequences: {no_seqs}")
 
     # filter the uniref90 database for the list of taxids
     if taxids:
