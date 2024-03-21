@@ -16,7 +16,6 @@ import sys
 import shutil
 import os
 import subprocess
-import gzip
 import rapidgzip as rapidgzip
 
 URL_UNIREF90 = "https://ftp.uniprot.org/pub/databases/uniprot/uniref/uniref90/uniref90.fasta.gz"
@@ -54,16 +53,9 @@ class FASTA:
         return len(self.sequence)
 
 
-def parse_fasta(fasta_file):
+def parse_fasta(fasta_file) -> None:
     """
     Parse the fasta file
-    Parameters
-    ----------
-    fasta_file
-
-    Returns
-    -------
-    Yields the FASTA object
     """
     with open(fasta_file, 'r') as f:
         name = ""
@@ -84,17 +76,11 @@ def parse_fasta(fasta_file):
         yield FASTA(name, sequence, description)
 
 
-def parse_fasta_gz(fasta_file, nthreads=2):
+def parse_fasta_gz(fasta_file, nthreads=2) -> None:
     """
     Parse the fasta file
-    Parameters
-    ----------
-    fasta_file
-
-    Returns
-    -------
-    Yields the FASTA object
     """
+
     with rapidgzip.open(fasta_file, parallelization=nthreads) as f:
         name = ""
         sequence = ""
@@ -127,7 +113,8 @@ def run_cmd(cmd, message=None) -> list:
         stdout, stderr = process.communicate()
         stdout = stdout.decode('utf-8').strip()
         stderr = stderr.decode('utf-8').strip()
-        if stderr:
+        run_code = process.returncode
+        if run_code != 0:
             logging.error(f"Error running the command: {cmd}")
             logging.error(f"Error: {stderr}")
             sys.exit(1)
@@ -280,7 +267,7 @@ def get_seq_ids(unireftaxon, db_taxon, db_seqids) -> int:
     return no_seqs
 
 
-def extract_seqs(unireffile, db_taxon, db_fasta, nthreads=2):
+def extract_seqs(unireffile, db_taxon, db_fasta, nthreads=2) -> int:
     """
     extract the sequences for the list of taxids
     """
@@ -304,7 +291,7 @@ def extract_seqs(unireffile, db_taxon, db_fasta, nthreads=2):
     return no_seqs
 
 
-def is_done(fname):
+def is_done(fname) -> None:
     """
     create a ok file with md5 checksum in it
     """
@@ -312,14 +299,14 @@ def is_done(fname):
     run_cmd(f"echo {fsize} > {fname}.ok")
 
 
-def is_completed(fname):
+def is_completed(fname) -> bool:
     """
     check if the process is complete
     """
     if os.path.exists(f"{fname}.ok"):
         fsize = os.path.getsize(fname)
         with open(f"{fname}.ok", 'r') as f:
-            if fsize == f.readline().strip():
+            if fsize == float(f.readline().strip()):
                 return True
     return False
 
@@ -346,14 +333,15 @@ def prepare_db(db_dir, dbname, nthreads, taxids=None) -> None:
 
     # filter the uniref90 database for the list of taxids
     if taxids:
-        db_taxon = os.path.join(unirefdir, f"{dbname}.taxids")
+        os.makedirs(os.path.join(db_dir, dbname), exist_ok=True)
+        db_taxon = os.path.join(db_dir, dbname, f"{dbname}.taxids")
         # get the children taxon ids from the taxids
         taxids = ','.join([str(taxid) for taxid in taxids])
-        run_cmd(f"taxonkit list --ids {taxids} --indent '' | sort | uniq > {db_taxon}")
+        run_cmd(f"taxonkit list --data-dir {taxondir} --threads {nthreads} --ids {taxids} --indent '' | sort | uniq > {db_taxon}")
         is_done(db_taxon)
 
         # filter the uniref90 database for the list of taxids
-        db_fasta = os.path.join(unirefdir, f"{dbname}.fasta")
+        db_fasta = os.path.join(db_dir, dbname, f"{dbname}.fasta")
         if not is_completed(db_fasta):
             if not is_completed(f"{unireffile}"):
                 run_cmd(f"rapidgzip -kd --force -P {nthreads} {unireffile_gz}")
@@ -362,7 +350,7 @@ def prepare_db(db_dir, dbname, nthreads, taxids=None) -> None:
             logging.info(f"Number of sequences to be included in the DB: {no_seqs}")
 
         # prepare the diamond database
-        run_cmd(f"diamond makedb --in {db_fasta} -d {unirefdir}/{dbname}.dmnd -p {nthreads}")
+        run_cmd(f"diamond makedb --in {db_fasta} -d {os.path.join(db_dir, dbname)}/{dbname}.dmnd -p {   nthreads}")
         logging.info("Database preparation complete.")
     else:
         run_cmd(f"diamond makedb --in {unireffile} -d {unirefdir}/uniref90")
@@ -389,8 +377,40 @@ def parse_args() -> argparse.Namespace:
     prepare_parser.add_argument('-n', '--name', help='database name', required=True)
     prepare_parser.add_argument('-t', '--taxids', help='taxid(s)', required=False, nargs='+', type=int)
     prepare_parser.add_argument('-p', '--threads', help='number of threads', required=False, type=int, default=2)
+
+    # add subcommand for running diamond search and classification
+    full_length_parser = subparsers.add_parser('full_length', help='run diamond search summarize full length isoforms',
+                                                description='run diamond search summarize full length isoforms')
+    full_length_parser.add_argument('-i', '--input', help='input fasta file', required=True)
+    full_length_parser.add_argument('-o', '--output', help='output file prefix', required=True)
+    full_length_parser.add_argument('-d', '--db_dir', help='diamond database directory (from prepare step)', required=True)
+    full_length_parser.add_argument('-n', '--name', help='database name', required=True)
+    full_length_parser.add_argument('-p', '--threads', help='number of threads', required=False, type=int, default=2)
+    full_length_parser.add_argument('-f', '--force', help='force to run the command', required=False, action='store_true')
+
     args = parser.parse_args(args=(sys.argv[1:] or ['--help']))
     return args
+
+
+def full_length_summarize(input, output, db_dir, name, nthreads, is_force) -> None:
+    """
+    run diamond and parse the output to calculate full length summary for isoforms
+    """
+    diamond_out = f"{output}.dmnd.out"
+    if not is_completed(diamond_out) or is_force:
+        if not os.path.exists(os.path.join(db_dir, name, f'{name}.dmnd')):
+            logging.error(f"Diamond database {name} is not present. Please prepare it using 'prepare' plugin.")
+            sys.exit(1)
+        run_cmd(f"diamond "
+                f"blastx "
+                f"-d {os.path.join(db_dir, name, f'{name}.dmnd')} "
+                f"-q {input} "
+                f"-o {diamond_out} "
+                f"-p {nthreads} "
+                f"--outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen "
+                f"--max-target-seqs 1 "
+                f"--quiet")
+        is_done(diamond_out)
 
 
 def main() -> None:
@@ -404,6 +424,8 @@ def main() -> None:
     elif args.command == 'prepare':
         args.taxids = [int(taxid) for taxid in args.taxids]
         prepare_db(args.db_dir, args.name, args.threads, args.taxids)
+    elif args.command == 'full_length':
+        full_length_summarize(args.input, args.output, args.db_dir, args.name, args.threads, args.force)
 
 
 if __name__ == "__main__":
