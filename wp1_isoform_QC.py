@@ -360,7 +360,7 @@ def prepare_db(db_dir, dbname, nthreads, taxids=None) -> None:
         db_fasta = os.path.join(unirefdir, f"{dbname}.fasta")
         if not is_completed(db_fasta):
             if not is_completed(f"{unireffile}.ok"):
-                run_cmd(f"rapidgzip -kd -P {nthreads} {unireffile_gz}")
+                run_cmd(f"rapidgzip -kd --force -P {nthreads} {unireffile_gz}")
                 is_done(unireffile)
             no_seqs = extract_seqs(unireffile, db_taxon, db_fasta, nthreads)
             logging.info(f"Number of sequences to be included in the DB: {no_seqs}")
