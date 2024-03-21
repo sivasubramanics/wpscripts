@@ -232,6 +232,9 @@ def download_db(db_dir) -> None:
     taxonfile = os.path.join(taxondir, 'taxdump.tar.gz')
     download_file(taxonfile)
     logging.info("Downloading taxonkit database complete.")
+    # extract the taxonkit database
+    run_cmd(f"tar -xzf {taxonfile} -C {taxondir}", "Extracting taxonkit database")
+    logging.info("Extracting taxonkit database complete.")
 
     unirefdir = os.path.join(db_dir, 'uniref90')
     unireffile = os.path.join(unirefdir, 'uniref90.fasta.gz')
@@ -295,7 +298,7 @@ def extract_seqs(unireffile, db_taxon, db_fasta, nthreads=2):
     logging.info(f"Extracting sequences for the taxids")
     n_seq = 0
     with open(db_fasta, 'w') as out:
-        for fasta in parse_fasta_gz(unireffile, nthreads):
+        for fasta in parse_fasta(unireffile):
             n_seq += 1
             if n_seq % 1000000 == 0:
                 logging.info(f"Processed {n_seq} sequences")
@@ -303,6 +306,26 @@ def extract_seqs(unireffile, db_taxon, db_fasta, nthreads=2):
                 out.write(f"{str(fasta)}\n")
                 no_seqs += 1
     return no_seqs
+
+
+def is_done(fname):
+    """
+    create a ok file with md5 checksum in it
+    """
+    md5 = run_cmd(f"md5sum {fname}")[0].split()[0]
+    run_cmd(f"echo {md5} > {fname}.ok")
+
+
+def is_completed(fname):
+    """
+    check if the process is complete
+    """
+    if os.path.exists(f"{fname}.ok"):
+        md5 = run_cmd(f"md5sum {fname}")[0].split()[0]
+        with open(f"{fname}.ok", 'r') as f:
+            if md5 == f.readline().strip():
+                return True
+    return False
 
 
 def prepare_db(db_dir, dbname, nthreads, taxids=None) -> None:
@@ -318,34 +341,29 @@ def prepare_db(db_dir, dbname, nthreads, taxids=None) -> None:
 
     # check if uniref90 fasta file is present
     unirefdir = os.path.join(db_dir, 'uniref90')
-    unireffile = os.path.join(unirefdir, 'uniref90.fasta.gz')
-    unireftaxon = os.path.join(unirefdir, f"uniref90.seqs.tsv")
-    if not os.path.exists(unireffile):
-        logging.error(f"Uniref90 database {unireffile} is not present. Please download it.")
+    unireffile_gz = os.path.join(unirefdir, 'uniref90.fasta.gz')
+    unireffile = os.path.join(unirefdir, 'uniref90.fasta')
+    if not os.path.exists(unireffile_gz):
+        logging.error(f"Uniref90 database {unireffile_gz} is not present. Please download it.")
         logging.error("Run the command: wp1_isoform_QC.py download -d <db_dir>")
         sys.exit(1)
-
-    # extract fasta headers from the uniref90 fasta file
-    # if not os.path.exists(unireftaxon):
-    #     no_seqs = get_headers(unireffile)
-    #     logging.info(f"Extracting sequence headers complete. Number of sequences: {no_seqs}")
 
     # filter the uniref90 database for the list of taxids
     if taxids:
         db_taxon = os.path.join(unirefdir, f"{dbname}.taxids")
-        db_seqids = os.path.join(unirefdir, f"{dbname}.seqids")
-        db_fasta = os.path.join(unirefdir, f"{dbname}.fasta")
-        # extract the taxonkit database
-        run_cmd(f"tar -xzf {taxonfile} -C {taxondir}", "Extracting taxonkit database")
-        logging.info("Extracting taxonkit database complete.")
         # get the children taxon ids from the taxids
         taxids = ','.join([str(taxid) for taxid in taxids])
         run_cmd(f"taxonkit list --ids {taxids} --indent '' | sort | uniq > {db_taxon}")
+        is_done(db_taxon)
 
         # filter the uniref90 database for the list of taxids
-        # no_seqs = get_seq_ids(unireftaxon, db_taxon, db_seqids)
-        no_seqs = extract_seqs(unireffile, db_taxon, db_fasta, nthreads)
-        logging.info(f"Number of sequences to be included in the DB: {no_seqs}")
+        db_fasta = os.path.join(unirefdir, f"{dbname}.fasta")
+        if not is_completed(db_fasta):
+            if not is_completed(f"{unireffile}.ok"):
+                run_cmd(f"rapidgzip -kd -P {nthreads} {unireffile_gz}")
+                is_done(unireffile)
+            no_seqs = extract_seqs(unireffile, db_taxon, db_fasta, nthreads)
+            logging.info(f"Number of sequences to be included in the DB: {no_seqs}")
 
         # prepare the diamond database
         run_cmd(f"diamond makedb --in {db_fasta} -d {unirefdir}/{dbname}.dmnd -p {nthreads}")
