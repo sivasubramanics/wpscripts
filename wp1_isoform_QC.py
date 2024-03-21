@@ -16,6 +16,7 @@ import sys
 import shutil
 import os
 import subprocess
+import gzip
 
 URL_UNIREF90 = "https://ftp.uniprot.org/pub/databases/uniprot/uniref/uniref90/uniref90.fasta.gz"
 URL_UNIREF90_META = "https://ftp.uniprot.org/pub/databases/uniprot/uniref/uniref90/RELEASE.metalink"
@@ -66,7 +67,7 @@ def parse_fasta(fasta_file):
     Yields the FASTA object
     """
     if fasta_file.endswith('.gz'):
-        f = subprocess.Popen(['zcat', fasta_file], stdout=subprocess.PIPE)
+        f = gzip.open(fasta_file, 'rt')
     else:
         f = open(fasta_file, 'r')
     name = ""
