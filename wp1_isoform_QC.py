@@ -54,7 +54,7 @@ class FASTA:
         return len(self.sequence)
 
 
-def parse_fasta(fasta_file, nthreads=2):
+def parse_fasta(fasta_file):
     """
     Parse the fasta file
     Parameters
@@ -65,27 +65,54 @@ def parse_fasta(fasta_file, nthreads=2):
     -------
     Yields the FASTA object
     """
-    if fasta_file.endswith('.gz'):
-        # f = gzip.open(fasta_file, 'rt')
-        f = rapidgzip.open(fasta_file, parallelization=nthreads)
-    else:
-        f = open(fasta_file, 'r')
-    name = ""
-    sequence = ""
-    description = ""
-    begun = False
-    for line in f:
-        if line.startswith(">"):
-            if begun:
-                yield FASTA(name, sequence, description)
-            line = line.strip()
-            name = line[1:]
-            description = line[1:]
-            sequence = ""
-            begun = True
-        else:
-            sequence += line.strip()
-    yield FASTA(name, sequence, description)
+    with open(fasta_file, 'r') as f:
+        name = ""
+        sequence = ""
+        description = ""
+        begun = False
+        for line in f:
+            if line.startswith(">"):
+                if begun:
+                    yield FASTA(name, sequence, description)
+                line = line.strip()
+                name = line[1:]
+                description = line[1:]
+                sequence = ""
+                begun = True
+            else:
+                sequence += line.strip()
+        yield FASTA(name, sequence, description)
+
+
+def parse_fasta_gz(fasta_file, nthreads=2):
+    """
+    Parse the fasta file
+    Parameters
+    ----------
+    fasta_file
+
+    Returns
+    -------
+    Yields the FASTA object
+    """
+    with rapidgzip.open(fasta_file, parallelization=nthreads) as f:
+        name = ""
+        sequence = ""
+        description = ""
+        begun = False
+        for line in f:
+            line = line.decode('utf-8').strip()
+            if line.startswith(">"):
+                if begun:
+                    yield FASTA(name, sequence, description)
+                line = line.strip()
+                name = line[1:]
+                description = line[1:]
+                sequence = ""
+                begun = True
+            else:
+                sequence += line.strip()
+        yield FASTA(name, sequence, description)
 
 
 def run_cmd(cmd, message=None) -> list:
@@ -267,7 +294,7 @@ def extract_seqs(unireffile, db_taxon, db_fasta, nthreads=2):
 
     logging.info(f"Extracting sequences for the taxids")
     with open(db_fasta, 'w') as out:
-        for fasta in parse_fasta(unireffile, nthreads):
+        for fasta in parse_fasta_gz(unireffile, nthreads):
             if fasta.taxid in taxonids:
                 out.write(f"{str(fasta)}\n")
                 no_seqs += 1
