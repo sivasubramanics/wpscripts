@@ -253,11 +253,21 @@ def extract_seqs(unireffile, db_taxon, db_fasta):
     extract the sequences for the list of taxids
     """
     no_seqs = 0
-    with open(db_taxon, 'r') as fh, open(db_fasta, 'w') as out:
-        taxonids = set([line.strip() for line in fh])
+    taxonids = []
+    with open(db_taxon, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if line == '':
+                continue
+            if line not in taxonids:
+                taxonids.append(line)
+    logging.info(f"Number of taxids to be included in the DB: {len(taxonids)}")
+
+    logging.info(f"Extracting sequences for the taxids")
+    with open(db_fasta, 'w') as out:
         for fasta in parse_fasta(unireffile):
             if fasta.taxid in taxonids:
-                out.write(str(fasta))
+                out.write(f"{str(fasta)}\n")
                 no_seqs += 1
     return no_seqs
 
