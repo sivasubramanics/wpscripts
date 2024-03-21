@@ -297,7 +297,7 @@ def prepare_db(db_dir, dbname, threads, taxids=None) -> None:
         run_cmd(f"tar -xzf {taxonfile} -C {taxondir}", "Extracting taxonkit database")
         logging.info("Extracting taxonkit database complete.")
         # get the children taxon ids from the taxids
-        taxids = [str(taxid) for taxid in taxids]
+        taxids = ','.join([str(taxid) for taxid in taxids])
         run_cmd(f"taxonkit list --ids {taxids} --indent '' | sort | uniq > {db_taxon}")
 
         # filter the uniref90 database for the list of taxids
