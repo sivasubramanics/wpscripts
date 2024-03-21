@@ -308,8 +308,8 @@ def is_done(fname):
     """
     create a ok file with md5 checksum in it
     """
-    md5 = run_cmd(f"md5sum {fname}")[0].split()[0]
-    run_cmd(f"echo {md5} > {fname}.ok")
+    fsize = os.path.getsize(fname)
+    run_cmd(f"echo {fsize} > {fname}.ok")
 
 
 def is_completed(fname):
@@ -317,9 +317,9 @@ def is_completed(fname):
     check if the process is complete
     """
     if os.path.exists(f"{fname}.ok"):
-        md5 = run_cmd(f"md5sum {fname}")[0].split()[0]
+        fsize = os.path.getsize(fname)
         with open(f"{fname}.ok", 'r') as f:
-            if md5 == f.readline().strip():
+            if fsize == f.readline().strip():
                 return True
     return False
 
@@ -355,7 +355,7 @@ def prepare_db(db_dir, dbname, nthreads, taxids=None) -> None:
         # filter the uniref90 database for the list of taxids
         db_fasta = os.path.join(unirefdir, f"{dbname}.fasta")
         if not is_completed(db_fasta):
-            if not is_completed(f"{unireffile}.ok"):
+            if not is_completed(f"{unireffile}"):
                 run_cmd(f"rapidgzip -kd --force -P {nthreads} {unireffile_gz}")
                 is_done(unireffile)
             no_seqs = extract_seqs(unireffile, db_taxon, db_fasta, nthreads)
