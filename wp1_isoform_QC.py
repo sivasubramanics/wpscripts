@@ -45,8 +45,6 @@ class FASTA:
         out_str = f">{self.name}"
         if self.description:
             out_str += f" {self.description}"
-        if self.readcounts:
-            out_str += f" readcounts={self.readcounts}"
         out_str += "\n"
         out_str += '\n'.join([self.sequence[i:i+width] for i in range(0, len(self.sequence), width)])
         return out_str
