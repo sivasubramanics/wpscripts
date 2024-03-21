@@ -296,12 +296,8 @@ def extract_seqs(unireffile, db_taxon, db_fasta, nthreads=2):
     logging.info(f"Number of taxids to be included in the DB: {len(taxonids)}")
 
     logging.info(f"Extracting sequences for the taxids")
-    n_seq = 0
     with open(db_fasta, 'w') as out:
         for fasta in parse_fasta(unireffile):
-            n_seq += 1
-            if n_seq % 1000000 == 0:
-                logging.info(f"Processed {n_seq} sequences")
             if fasta.taxid in taxonids:
                 out.write(f"{str(fasta)}\n")
                 no_seqs += 1
