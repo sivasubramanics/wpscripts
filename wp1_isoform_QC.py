@@ -17,6 +17,7 @@ import shutil
 import os
 import subprocess
 import gzip
+import rapidgzip as rapidgzip
 
 URL_UNIREF90 = "https://ftp.uniprot.org/pub/databases/uniprot/uniref/uniref90/uniref90.fasta.gz"
 URL_UNIREF90_META = "https://ftp.uniprot.org/pub/databases/uniprot/uniref/uniref90/RELEASE.metalink"
@@ -53,7 +54,7 @@ class FASTA:
         return len(self.sequence)
 
 
-def parse_fasta(fasta_file):
+def parse_fasta(fasta_file, nthreads=2):
     """
     Parse the fasta file
     Parameters
@@ -65,7 +66,8 @@ def parse_fasta(fasta_file):
     Yields the FASTA object
     """
     if fasta_file.endswith('.gz'):
-        f = gzip.open(fasta_file, 'rt')
+        # f = gzip.open(fasta_file, 'rt')
+        f = rapidgzip.open(fasta_file, parallelization=nthreads)
     else:
         f = open(fasta_file, 'r')
     name = ""
@@ -248,7 +250,7 @@ def get_seq_ids(unireftaxon, db_taxon, db_seqids) -> int:
     return no_seqs
 
 
-def extract_seqs(unireffile, db_taxon, db_fasta):
+def extract_seqs(unireffile, db_taxon, db_fasta, nthreads=2):
     """
     extract the sequences for the list of taxids
     """
@@ -265,14 +267,14 @@ def extract_seqs(unireffile, db_taxon, db_fasta):
 
     logging.info(f"Extracting sequences for the taxids")
     with open(db_fasta, 'w') as out:
-        for fasta in parse_fasta(unireffile):
+        for fasta in parse_fasta(unireffile, nthreads):
             if fasta.taxid in taxonids:
                 out.write(f"{str(fasta)}\n")
                 no_seqs += 1
     return no_seqs
 
 
-def prepare_db(db_dir, dbname, threads, taxids=None) -> None:
+def prepare_db(db_dir, dbname, nthreads, taxids=None) -> None:
     """
     Prepare the database for diamond search
     """
@@ -311,7 +313,7 @@ def prepare_db(db_dir, dbname, threads, taxids=None) -> None:
 
         # filter the uniref90 database for the list of taxids
         # no_seqs = get_seq_ids(unireftaxon, db_taxon, db_seqids)
-        no_seqs = extract_seqs(unireffile, db_taxon, db_fasta)
+        no_seqs = extract_seqs(unireffile, db_taxon, db_fasta, nthreads)
         logging.info(f"Number of sequences to be included in the DB: {no_seqs}")
 
         # prepare the diamond database
