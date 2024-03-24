@@ -392,11 +392,26 @@ def parse_args() -> argparse.Namespace:
     return args
 
 
-def full_length_summarize(input, output, db_dir, name, nthreads, is_force) -> None:
+def full_length_summarize(input, out_prefix, db_dir, name, nthreads, is_force) -> None:
     """
     run diamond and parse the output to calculate full length summary for isoforms
     """
-    diamond_out = f"{output}.dmnd.out"
+    diamond_out = run_diamond(db_dir, input, is_force, name, nthreads, out_prefix)
+
+    diamond_cov = f"{out_prefix}.dmnd.cov.tsv"
+    # parse the diamond output
+    with open(diamond_out, 'r') as f, open(diamond_cov, 'w') as out:
+        for line in f:
+            line = line.strip().split()
+            qseqid, sseqid, pident, length, mismatch, gapopen, qstart, qend, sstart, send, evalue, bitscore, qcov, scov, qlen, slen = line
+            if float(scov) >= 60:
+                out.write(f"{qseqid}\t{qlen}\t{sseqid}\t{slen}\t{pident}\t{length}\t{qcov}\t{scov}\n")
+    is_done(diamond_cov)
+    logging.info(f"Full length isoform summary is written to {diamond_cov}")
+
+
+def run_diamond(db_dir, input, is_force, name, nthreads, out_prefix) -> str:
+    diamond_out = f"{out_prefix}.dmnd.out"
     if not is_completed(diamond_out) or is_force:
         if not os.path.exists(os.path.join(db_dir, name, f'{name}.dmnd')):
             logging.error(f"Diamond database {name} is not present. Please prepare it using 'prepare' plugin.")
@@ -407,10 +422,11 @@ def full_length_summarize(input, output, db_dir, name, nthreads, is_force) -> No
                 f"-q {input} "
                 f"-o {diamond_out} "
                 f"-p {nthreads} "
-                f"--outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen "
-                f"--max-target-seqs 1 "
+                # f"--outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen "
+                f"--sensitive --iterate -e 0.0001 --top 5  --outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qcovhsp scovhsp qlen slen "
                 f"--quiet")
         is_done(diamond_out)
+    return diamond_out
 
 
 def main() -> None:
