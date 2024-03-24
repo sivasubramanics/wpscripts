@@ -103,7 +103,7 @@ then
 else
     # minimap2 mapping of isoforms on the genome
     print_log "minimap2_mapping"
-    run_cmd "minimap2 -ax splice -C5 --secondary=no -t ${THREADS} ${GENOME} ${ISFOFORMS} > ${PREFIX}.sam | samtools view -F0x900 2> ${PREFIX}.sam.log"
+    run_cmd "minimap2 -ax splice -C5 --secondary=no -t ${THREADS} ${GENOME} ${ISFOFORMS} | samtools view -F0x900 > ${PREFIX}.sam  2> ${PREFIX}.sam.log"
     touch ${PREFIX}.sam.ok
 fi
 
