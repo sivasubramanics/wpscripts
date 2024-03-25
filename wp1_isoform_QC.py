@@ -415,6 +415,12 @@ def parse_args() -> argparse.Namespace:
     diamond_parser.add_argument('-p', '--threads', help='number of threads', required=False, type=int, default=2)
     diamond_parser.add_argument('-f', '--force', help='force to run the command', required=False, action='store_true')
 
+    flt_parser = subparsers.add_parser('full_len_tr', help='parse diamond output and summarize full length isoforms',
+                                        description='parse diamond output and summarize full length isoforms')
+    flt_parser.add_argument('-i', '--input', help='input diamond output file', required=True)
+    flt_parser.add_argument('-o', '--output', help='output file', required=True)
+    flt_parser.add_argument('-f', '--force', help='force to run the command', required=False, action='store_true')
+
     args = parser.parse_args(args=(sys.argv[1:] or ['--help']))
     return args
 
@@ -430,9 +436,9 @@ def full_length_summarize(input, out_prefix, db_dir, name, nthreads, is_force) -
     with open(diamond_out, 'r') as f, open(diamond_cov, 'w') as out:
         for line in f:
             line = line.strip().split()
-            qseqid, sseqid, pident, length, mismatch, gapopen, qstart, qend, sstart, send, evalue, bitscore, qcov, scov, qlen, slen = line
-            if float(scov) >= 60:
-                out.write(f"{qseqid}\t{qlen}\t{sseqid}\t{slen}\t{pident}\t{length}\t{qcov}\t{scov}\n")
+            qseqid, sseqid, pident, length, mismatch, gapopen, qstart, qend, sstart, send, evalue, bitscore, qlen, slen, qcov, scov = line
+            
+
     is_done(diamond_cov)
     logging.info(f"Full length isoform summary is written to {diamond_cov}")
 
@@ -449,7 +455,7 @@ def run_diamond(db_dir, input, is_force, name, nthreads, out_prefix) -> str:
                 f"-q {input} "
                 f"-o {diamond_out} "
                 f"-p {nthreads} "
-                f"--outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qcovhsp scovhsp qlen slen "
+                f"--outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qcovhsp scovhsp qlen slen qcovhsp scovhsp "
                 f"--evalue 1e-10 "
                 f"--max-target-seqs 1 "
                 # f"--outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen "
@@ -474,6 +480,7 @@ def main() -> None:
         full_length_summarize(args.input, args.output, args.db_dir, args.name, args.threads, args.force)
     elif args.command == 'diamond':
         run_diamond(args.db_dir, args.input, args.force, args.name, args.threads, args.output)
+
     else:
         logging.error("Unknown command. Please check the help message.")
         sys.exit(1)
