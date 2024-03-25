@@ -54,6 +54,8 @@ class FASTA:
         return len(self.sequence)
 
 
+
+
 def parse_fasta(fasta_file) -> None:
     """
     Parse the fasta file
@@ -68,7 +70,7 @@ def parse_fasta(fasta_file) -> None:
                 if begun:
                     yield FASTA(name, sequence, description)
                 line = line.strip()
-                name = line[1:]
+                name = line[1:].split()[0]
                 description = line[1:]
                 sequence = ""
                 begun = True
@@ -419,36 +421,75 @@ def parse_args() -> argparse.Namespace:
     flt_parser = subparsers.add_parser('full_len_tr', help='parse diamond output and summarize full length isoforms',
                                         description='parse diamond output and summarize full length isoforms')
     flt_parser.add_argument('-i', '--input', help='input diamond output file', required=True)
+    flt_parser.add_argument('-t', '--transcripts', help='transcripts fasta file', required=True)
+    flt_parser.add_argument('-o', '--output', help='output file prefix', required=True)
     flt_parser.add_argument('-f', '--force', help='force to run the command', required=False, action='store_true')
 
     args = parser.parse_args(args=(sys.argv[1:] or ['--help']))
     return args
 
 
-def full_length_summarize(input, is_force) -> None:
+def full_length_summarize(input, transcripts_fasta, out_prefix, is_force) -> None:
     """
     run diamond and parse the output to calculate full length summary for isoforms
     """
-    diamond_cov = f"{input}.summary.tsv"
+    diamond_cov = f"{out_prefix}.full_length_summary.tsv"
+
+    if not os.path.exists(transcripts_fasta):
+        logging.error(f"Transcripts fasta file {transcripts_fasta} is not present.")
+        sys.exit(1)
+
+    seq_dict = defaultdict()
+    for tr in parse_fasta(transcripts_fasta):
+        seq_dict[tr.name] = tr
+    seq_ids = list(seq_dict.keys())
+
     summary_table = defaultdict()
     # parse the diamond output
     with open(input, 'r') as f, open(diamond_cov, 'w') as out:
         for line in f:
             line = line.strip().split()
-            qseqid, sseqid, pident, length, mismatch, gapopen, qstart, qend, sstart, send, evalue, bitscore, qlen, slen, qcov, scov = line
+            qseqid, sseqid, pident, length, mismatch, gapopen, qstart, qend, sstart, send, evalue, bitscore, qcov, scov, qlen, slen = line
+            if qseqid not in seq_dict:
+                logging.error(f"Sequence {qseqid} is not present in the transcripts fasta file.")
+                sys.exit(1)
             qcov = float(qcov)
             scov = float(scov)
-            max_cov = max(qcov, scov)
-            win_cov = int(max_cov / 10) * 10
+            # max_cov = max(qcov, scov)
+            max_cov = scov
+            win_cov = (int(max_cov / 10)+1) * 10
+            if win_cov == 110:
+                win_cov = 100
             if win_cov not in summary_table:
                 summary_table[win_cov] = []
             summary_table[win_cov].append(qseqid)
+            seq_ids.remove(qseqid)
     # write the summary table
     with open(diamond_cov, 'w') as out:
-        out.write("Coverage\tNo_of_isoforms\n")
-        for cov in sorted(summary_table.keys()):
-            out.write(f"{cov}\t{len(summary_table[cov])}\n")
-
+        cum_percentage = 0
+        out.write("Coverage\tNo_of_isoforms\tpercentage\tcumulative\n")
+        for cov in sorted(summary_table.keys(), reverse=True):
+            percentage = len(summary_table[cov])/len(seq_dict)*100
+            cum_percentage += percentage
+            out.write(f"{cov}\t{len(summary_table[cov])}\t{percentage:.2f}\t{cum_percentage:.2f}\n")
+            sub_fasta = f"{out_prefix}.{cov}.fasta"
+            sub_ids = f"{out_prefix}.{cov}.ids"
+            with open(sub_ids, 'w') as f:
+                for seqid in summary_table[cov]:
+                    f.write(f"{seqid}\n")
+            run_cmd(f"seqkit grep -f {sub_ids} {transcripts_fasta} > {sub_fasta}")
+            os.remove(sub_ids)
+        if seq_ids:
+            percentage = len(seq_ids)/len(seq_dict)*100
+            cum_percentage += percentage
+            out.write(f"0\t{len(seq_ids)}\t{percentage:.2f}\t{cum_percentage:.2f}\n")
+            sub_fasta = f"{out_prefix}.0.fasta"
+            sub_ids = f"{out_prefix}.0.ids"
+            with open(sub_ids, 'w') as f:
+                for seqid in seq_ids:
+                    f.write(f"{seqid}\n")
+            run_cmd(f"seqkit grep -f {sub_ids} {transcripts_fasta} > {sub_fasta}")
+            os.remove(sub_ids)
     is_done(diamond_cov)
     logging.info(f"Full length isoform summary is written to {diamond_cov}")
 
@@ -491,7 +532,7 @@ def main() -> None:
     elif args.command == 'diamond':
         run_diamond(args.db_dir, args.input, args.force, args.name, args.threads, args.output)
     elif args.command == 'full_len_tr':
-        full_length_summarize(args.input, args.force)
+        full_length_summarize(args.input, args.transcripts, args.output, args.force)
     else:
         logging.error("Unknown command. Please check the help message.")
         sys.exit(1)

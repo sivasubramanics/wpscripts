@@ -104,7 +104,7 @@ def main():
     parser.add_argument('-i', '--input', help='input fasta file', required=True)
     parser.add_argument('-o', '--output', help='output prefix file', required=True)
     parser.add_argument('-m', '--map', help='gene to transcript map file', required=True)
-    parser.add_argument('-t', '--type', help='type of selection: len or exp', required=True)
+    parser.add_argument('-t', '--type', help='type of selection: len or exp or len_pep', required=True)
     parser.add_argument('-e', '--exp', help='expression count matrix file', required=False)
     parser.add_argument('-p', '--pep', help='extract proteins file', required=False)
     args = parser.parse_args()
@@ -113,7 +113,7 @@ def main():
     gene_to_tr = read_gene_to_tr(args.map)
 
     # read the fasta file and read the sequence length
-    transcripts = defaultdict(int)
+    transcripts = defaultdict()
     for fasta in parse_fasta(args.input):
         transcripts[fasta.name] = fasta
 
@@ -194,11 +194,40 @@ def main():
                     out_line = "\t".join(line)
                     g.write(f"{out_line}\n")
 
+    elif args.type == 'len_pep':
+        if args.pep is None:
+            print("Protein fasta file is required for type len_pep", file=sys.stderr)
+            sys.exit(1)
+
+        tr_fasta_out = f"{args.output}.len_orf.fasta"
+        tr_map_out = f"{args.output}.len_orf.map"
+        pep_fasta_out = f"{args.output}.len_orf.pep.fasta"
+
+        proteins = defaultdict()
+        for protein in parse_fasta(args.pep):
+            proteins[protein.name] = protein
+
+        # open the output files
+        try:
+            f = open(tr_fasta_out, 'w')
+            g = open(tr_map_out, 'w')
+            h = open(pep_fasta_out, 'w')
+        except IOError:
+            print(f"Error opening the output files {tr_fasta_out} or {tr_map_out} or {pep_fasta_out}", file=sys.stderr)
+            sys.exit(1)
+
+        # select the longest protein for each gene
+        for gene in gene_to_tr:
+            next_best_tr = None
+            print(f"Gene {gene}", file=sys.stderr)
+            lengths = [len(proteins[tr]) for tr in gene_to_tr[gene]]
+            write_isoform(f, g, gene, gene_to_tr, lengths, next_best_tr, transcripts, h, proteins)
+
     else:
         print(f"Invalid type {args.type}. Please choose len or exp", file=sys.stderr)
         sys.exit(1)
 
-    if args.pep:
+    if args.pep and args.type != 'len_pep':
         if args.type == 'len':
             map_file = f"{args.output}.len.map"
             pep_file = f"{args.output}.len.pep"
@@ -248,7 +277,7 @@ def parse_exp_file(count_matrix_file, transcripts):
     return transcripts
 
 
-def write_isoform(f, g, gene, gene_to_tr, values, next_best_tr, transcripts):
+def write_isoform(f, g, gene, gene_to_tr, values, next_best_tr, transcripts, h=None, proteins=None):
     """
     Write the best isoform to the output file
     Parameters
@@ -274,6 +303,10 @@ def write_isoform(f, g, gene, gene_to_tr, values, next_best_tr, transcripts):
 
     f.write(f"{str(out_tr)}\n")
     g.write(f"{gene}\t{best_tr}\n")
+
+    if h is not None:
+        out_prot = FASTA(gene, proteins[best_tr].sequence, f"old_name={best_tr} next_best={next_best_tr}")
+        h.write(f"{str(out_prot)}\n")
 
 
 if __name__ == "__main__":
