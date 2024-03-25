@@ -219,7 +219,6 @@ def main():
         # select the longest protein for each gene
         for gene in gene_to_tr:
             next_best_tr = None
-            print(f"Gene {gene}", file=sys.stderr)
             lengths = [len(proteins[tr]) for tr in gene_to_tr[gene]]
             write_isoform(f, g, gene, gene_to_tr, lengths, next_best_tr, transcripts, h, proteins)
 
