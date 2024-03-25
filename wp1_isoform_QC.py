@@ -229,13 +229,12 @@ def download_db(db_dir) -> None:
     logging.info("Downloading uniref90 database complete.")
 
 
-def get_headers(unireffile) -> int:
+def get_headers(unireffile, outfile) -> int:
     """
     extract sequence ID and Taxid from the uniref90 fasta file
     """
     no_seqs = 0
-    outfile = os.path.join(os.path.dirname(unireffile), 'uniref90.seqs.tsv')
-    run_cmd(f"zcat {unireffile} | grep '^>' > {unireffile}.headers")
+    run_cmd(f"grep '^>' {unireffile} > {unireffile}.headers")
     with open(f"{unireffile}.headers", 'r') as fh, open(outfile, 'w') as out:
         for line in fh:
             line = line.strip().split()
@@ -334,21 +333,38 @@ def prepare_db(db_dir, dbname, nthreads, taxids=None) -> None:
     # filter the uniref90 database for the list of taxids
     if taxids:
         os.makedirs(os.path.join(db_dir, dbname), exist_ok=True)
-        db_taxon = os.path.join(db_dir, dbname, f"{dbname}.taxids")
-        # get the children taxon ids from the taxids
-        taxids = ','.join([str(taxid) for taxid in taxids])
-        run_cmd(f"taxonkit list --data-dir {taxondir} --threads {nthreads} --ids {taxids} --indent '' | sort | uniq > {db_taxon}")
-        is_done(db_taxon)
 
-        # filter the uniref90 database for the list of taxids
+        # filenames
         db_fasta = os.path.join(db_dir, dbname, f"{dbname}.fasta")
+        db_taxon = os.path.join(db_dir, dbname, f"{dbname}.taxids")
+        db_seqids = os.path.join(db_dir, dbname, f"{dbname}.seqids")
+        unireffile = os.path.join(unirefdir, 'uniref90.fasta')
+        unireffile_gz = os.path.join(unirefdir, 'uniref90.fasta.gz')
+        unirefseq2taxon = os.path.join(unirefdir, 'uniref90.fasta.seqids.tsv')
         if not is_completed(db_fasta):
-            if not is_completed(f"{unireffile}"):
+            db_taxon = os.path.join(db_dir, dbname, f"{dbname}.taxids")
+            if not is_completed(db_taxon):
+                # get the children taxon ids from the taxids
+                taxids = ','.join([str(taxid) for taxid in taxids])
+                run_cmd(f"taxonkit list --data-dir {taxondir} --threads {nthreads} --ids {taxids} --indent '' | sort | uniq > {db_taxon}")
+                is_done(db_taxon)
+
+            if not is_completed(unireffile):
+                # extract the uniref90 fasta file
                 run_cmd(f"rapidgzip -kd --force -P {nthreads} {unireffile_gz}")
                 is_done(unireffile)
-            no_seqs = extract_seqs(unireffile, db_taxon, db_fasta, nthreads)
-            logging.info(f"Number of sequences to be included in the DB: {no_seqs}")
+            if not is_completed(unirefseq2taxon):
+                # parse the uniref90 fasta file to get the sequence ids and its corresponding taxids
+                no_seqs = get_headers(unireffile, unirefseq2taxon)
+                is_done(unirefseq2taxon)
+            if not is_completed(db_seqids):
+                no_seqs = get_seq_ids(unirefseq2taxon, db_taxon, db_seqids)
+                is_done(db_seqids)
 
+            no_seqs = run_cmd(f"wc -l {db_seqids}")[0].split()[0]
+            run_cmd(f"seqkit grep -f {db_seqids} {unireffile} > {db_fasta}")
+            logging.info(f"Number of sequences to be included in the DB: {no_seqs}")
+            is_done(db_fasta)
         # prepare the diamond database
         run_cmd(f"diamond makedb --in {db_fasta} -d {os.path.join(db_dir, dbname)}/{dbname}.dmnd -p {   nthreads}")
         logging.info("Database preparation complete.")
