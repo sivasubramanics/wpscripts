@@ -449,8 +449,11 @@ def run_diamond(db_dir, input, is_force, name, nthreads, out_prefix) -> str:
                 f"-q {input} "
                 f"-o {diamond_out} "
                 f"-p {nthreads} "
+                f"--outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qcovhsp scovhsp qlen slen "
+                f"--evalue 1e-10 "
+                f"--max-target-seqs 1"
                 # f"--outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen "
-                f"--sensitive --iterate -e 0.0001 --top 5  --outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qcovhsp scovhsp qlen slen "
+                # f"--sensitive --iterate -e 0.0001 --top 5  --outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qcovhsp scovhsp qlen slen "
                 f"--quiet")
         is_done(diamond_out)
     return diamond_out
