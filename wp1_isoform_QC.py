@@ -17,6 +17,7 @@ import shutil
 import os
 import subprocess
 import rapidgzip as rapidgzip
+from collections import defaultdict
 
 URL_UNIREF90 = "https://ftp.uniprot.org/pub/databases/uniprot/uniref/uniref90/uniref90.fasta.gz"
 URL_UNIREF90_META = "https://ftp.uniprot.org/pub/databases/uniprot/uniref/uniref90/RELEASE.metalink"
@@ -418,26 +419,35 @@ def parse_args() -> argparse.Namespace:
     flt_parser = subparsers.add_parser('full_len_tr', help='parse diamond output and summarize full length isoforms',
                                         description='parse diamond output and summarize full length isoforms')
     flt_parser.add_argument('-i', '--input', help='input diamond output file', required=True)
-    flt_parser.add_argument('-o', '--output', help='output file', required=True)
     flt_parser.add_argument('-f', '--force', help='force to run the command', required=False, action='store_true')
 
     args = parser.parse_args(args=(sys.argv[1:] or ['--help']))
     return args
 
 
-def full_length_summarize(input, out_prefix, db_dir, name, nthreads, is_force) -> None:
+def full_length_summarize(input, is_force) -> None:
     """
     run diamond and parse the output to calculate full length summary for isoforms
     """
-    diamond_out = run_diamond(db_dir, input, is_force, name, nthreads, out_prefix)
-
-    diamond_cov = f"{out_prefix}.dmnd.cov.tsv"
+    diamond_cov = f"{input}.summary.tsv"
+    summary_table = defaultdict()
     # parse the diamond output
-    with open(diamond_out, 'r') as f, open(diamond_cov, 'w') as out:
+    with open(input, 'r') as f, open(diamond_cov, 'w') as out:
         for line in f:
             line = line.strip().split()
             qseqid, sseqid, pident, length, mismatch, gapopen, qstart, qend, sstart, send, evalue, bitscore, qlen, slen, qcov, scov = line
-            
+            qcov = float(qcov)
+            scov = float(scov)
+            max_cov = max(qcov, scov)
+            win_cov = int(max_cov / 10) * 10
+            if win_cov not in summary_table:
+                summary_table[win_cov] = []
+            summary_table[win_cov].append(qseqid)
+    # write the summary table
+    with open(diamond_cov, 'w') as out:
+        out.write("Coverage\tNo_of_isoforms\n")
+        for cov in sorted(summary_table.keys()):
+            out.write(f"{cov}\t{len(summary_table[cov])}\n")
 
     is_done(diamond_cov)
     logging.info(f"Full length isoform summary is written to {diamond_cov}")
@@ -455,7 +465,7 @@ def run_diamond(db_dir, input, is_force, name, nthreads, out_prefix) -> str:
                 f"-q {input} "
                 f"-o {diamond_out} "
                 f"-p {nthreads} "
-                f"--outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qcovhsp scovhsp qlen slen qcovhsp scovhsp "
+                f"--outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qcovhsp scovhsp qlen slen "
                 f"--evalue 1e-10 "
                 f"--max-target-seqs 1 "
                 # f"--outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen "
@@ -480,7 +490,8 @@ def main() -> None:
         full_length_summarize(args.input, args.output, args.db_dir, args.name, args.threads, args.force)
     elif args.command == 'diamond':
         run_diamond(args.db_dir, args.input, args.force, args.name, args.threads, args.output)
-
+    elif args.command == 'full_len_tr':
+        full_length_summarize(args.input, args.force)
     else:
         logging.error("Unknown command. Please check the help message.")
         sys.exit(1)
