@@ -164,7 +164,7 @@ def check_tools() -> None:
     """
     Check for the tools if its installed: taxonkit, diamond
     """
-    tools = ['taxonkit', 'diamond', 'wget']
+    tools = ['taxonkit', 'diamond', 'wget', 'seqkit']
     try:
         for tool in tools:
             shutil.which(tool)
@@ -235,6 +235,7 @@ def get_headers(unireffile, outfile) -> int:
     """
     no_seqs = 0
     run_cmd(f"grep '^>' {unireffile} > {unireffile}.headers")
+    logging.info(f"Extracting sequence ID and Taxid from the uniref90 fasta file")
     with open(f"{unireffile}.headers", 'r') as fh, open(outfile, 'w') as out:
         for line in fh:
             line = line.strip().split()
@@ -254,6 +255,7 @@ def get_seq_ids(unireftaxon, db_taxon, db_seqids) -> int:
     Get the sequence ids for the list of taxids present in db_taxon file
     """
     no_seqs = 0
+    logging.info(f"Extracting sequence IDs for the taxids")
     with open(db_taxon, 'r') as fh, open(unireftaxon, 'r') as uniref, open(db_seqids, 'w') as out:
         taxids = set([line.strip() for line in fh])
         for line in uniref:
@@ -363,7 +365,7 @@ def prepare_db(db_dir, dbname, nthreads, taxids=None) -> None:
 
             no_seqs = run_cmd(f"wc -l {db_seqids}")[0].split()[0]
             run_cmd(f"seqkit grep -f {db_seqids} {unireffile} > {db_fasta}")
-            logging.info(f"Number of sequences to be included in the DB: {no_seqs}")
+            logging.info(f"Number of sequences to be included in the DB: {no_seqs:,}")
             is_done(db_fasta)
         # prepare the diamond database
         run_cmd(f"diamond makedb --in {db_fasta} -d {os.path.join(db_dir, dbname)}/{dbname}.dmnd -p {   nthreads}")
@@ -403,6 +405,15 @@ def parse_args() -> argparse.Namespace:
     full_length_parser.add_argument('-n', '--name', help='database name', required=True)
     full_length_parser.add_argument('-p', '--threads', help='number of threads', required=False, type=int, default=2)
     full_length_parser.add_argument('-f', '--force', help='force to run the command', required=False, action='store_true')
+
+    diamond_parser = subparsers.add_parser('diamond', help='run diamond search',
+                                             description='run diamond search')
+    diamond_parser.add_argument('-i', '--input', help='input fasta file', required=True)
+    diamond_parser.add_argument('-o', '--output', help='output file prefix', required=True)
+    diamond_parser.add_argument('-d', '--db_dir', help='diamond database directory (from prepare step). basedir name will be taken from -n', required=True)
+    diamond_parser.add_argument('-n', '--name', help='database name eg: "asterids" for asterids/asterids.dmnd', required=True)
+    diamond_parser.add_argument('-p', '--threads', help='number of threads', required=False, type=int, default=2)
+    diamond_parser.add_argument('-f', '--force', help='force to run the command', required=False, action='store_true')
 
     args = parser.parse_args(args=(sys.argv[1:] or ['--help']))
     return args
@@ -458,6 +469,11 @@ def main() -> None:
         prepare_db(args.db_dir, args.name, args.threads, args.taxids)
     elif args.command == 'full_length':
         full_length_summarize(args.input, args.output, args.db_dir, args.name, args.threads, args.force)
+    elif args.command == 'diamond':
+        run_diamond(args.db_dir, args.input, args.force, args.name, args.threads, args.output)
+    else:
+        logging.error("Unknown command. Please check the help message.")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
