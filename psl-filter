@@ -55,6 +55,29 @@ class PSL:
         # my $pslScore = $sizeMul * ($matches + ( $repMatches >> 1) ) - $sizeMul * $misMatches - $qNumInsert - $tNumInsert;
         return self.matches + (self.rep_matches / 2) - self.mismatches - self.q_num_insert - self.t_num_insert
 
+    def to_summary(self):
+        # return qname, qlen, tname, tstart, tend, strand, q_aln_len, t_aln_len, qcov, identity, blockcount, pslscore
+        return f"{self.q_name}\t{self.q_size}\t{self.t_name}\t{self.t_start}\t{self.t_end}\t{self.strand}\t{self.q_end - self.q_start}\t{self.t_end - self.t_start}\t{self.get_query_coverage()*100:.2f}\t{self.get_identity()*100:.2f}\t{self.block_count}\t{self.psl_score():.0f}"
+
+    def to_gtf(self):
+        gtf_lines = []
+        gtf_score = self.psl_score() / self.q_size * 1000
+        # transcript line
+        gtf_lines.append(f"{self.t_name}\tblat\ttranscript\t{self.t_start + 1}\t{self.t_end}\t{gtf_score:.0f}\t{self.strand}\t.\tgene_id \"{self.q_name}\"; transcript_id \"{self.q_name}\";")
+        for i in range(self.block_count):
+            # exon lines
+            gtf_lines.append(f"{self.t_name}\tblat\texon\t{self.t_starts[i] + 1}\t{self.t_starts[i] + self.block_sizes[i]}\t.\t{self.strand}\t.\tgene_id \"{self.q_name}\"; transcript_id \"{self.q_name}\";")
+
+        return '\n'.join(gtf_lines)
+
+    def to_bed(self):
+        bed_score = self.psl_score()/self.q_size*1000
+        if self.strand == "+":
+            rgb = "255,0,0"
+        else:
+            rgb = "0,0,255"
+        return f"{self.t_name}\t{self.t_start}\t{self.t_end}\t{self.q_name}\t{bed_score:.0f}\t{self.strand}\t{self.t_start}\t{self.t_end}\t{rgb}\t{self.block_count}\t{','.join([str(x) for x in self.block_sizes])}\t{','.join([str(x) for x in self.t_starts])}"
+
 
 def parse_fasta(fasta_file):
     fasta_dict = defaultdict(str)
@@ -73,6 +96,63 @@ def parse_fasta(fasta_file):
                 sequence += line.strip()
         fasta_dict[name] = len(sequence)
     return fasta_dict
+
+
+def parse_psl(input):
+    """
+    Parse the PSL file and return the list of PSL object per query
+    """
+    psls = []
+    last_q_name = ""
+    with open(input, 'r') as f:
+        for line in f:
+            psl = PSL(line)
+            if psl.q_name != last_q_name and last_q_name:
+                yield psls
+                psls = []
+            psls.append(psl)
+            last_q_name = psl.q_name
+        yield psls
+
+def genome_psl(input, out):
+    """
+    Parse the PSL file, get the best hit for each query and write coverage summary in output file
+    """
+    out_psl = open(f"{out}.psl", 'w')
+    out_gtf = open(f"{out}.gtf", 'w')
+    out_bed = open(f"{out}.bed", 'w')
+    out_summary = open(f"{out}.summary", 'w')
+    best_hit = []
+    for psls in parse_psl(input):
+        best_hit = best_hit_psl(psls)
+        for i in range(len(best_hit)):
+            psl = best_hit[i]
+            out_psl.write(f"{psl}\n")
+            out_summary.write(f"{psl.to_summary()}\n")
+            if i > 0:
+                # since GTF can not have same transcript id, we append _i to the transcript id
+                psl.q_name = f"{psl.q_name}_{i}"
+            out_gtf.write(f"{psl.to_gtf()}\n")
+            out_bed.write(f"{psl.to_bed()}\n")
+
+
+
+
+def best_hit_psl(psls):
+    """
+    Get the best hit from the list of PSL objects
+    """
+    best_psl = []
+    for psl in psls:
+        if best_psl == []:
+            best_psl = [psl]
+        else:
+            # check if the current psl has better score than the last element of best psl
+            if psl.psl_score() > best_psl[-1].psl_score():
+                best_psl = [psl]
+            elif psl.psl_score() == best_psl[-1].psl_score():
+                best_psl.append(psl)
+    return best_psl
 
 
 def main():
@@ -97,6 +177,11 @@ def main():
     sort_psl_parser.add_argument('-i', '--input', help='input psl file', required=True)
     sort_psl_parser.add_argument('-o', '--output', help='output psl file', required=True)
 
+    genome_psl_parser = subparsers.add_parser('genome_psl', help='parse the PSL file, rna mapped on genome',
+                                              description='parse the PSL file, rna mapped on genome')
+    genome_psl_parser.add_argument('-i', '--input', help='input psl file', required=True)
+    genome_psl_parser.add_argument('-o', '--out', help='output prefix', required=True)
+
     args = parser.parse_args(args=None if sys.argv[1:] else ['--help'])
 
     if args.command == 'filter':
@@ -113,6 +198,9 @@ def main():
 
     if args.command == 'sort':
         sort_psl(args.input, args.output)
+
+    if args.command == 'genome_psl':
+        genome_psl(args.input, args.out)
 
 
 def filter_psl(in_file, out_file, query_coverage, identity, max_blocks, query_fasta=None, target_fasta=None):
@@ -186,7 +274,8 @@ def sort_lists(list_a, list_b):
 
     # Extract the rearranged list_a
     rearranged_list_a = [item[0] for item in sorted_combined]
-
     return rearranged_list_a
+
+
 if __name__ == "__main__":
     main()
