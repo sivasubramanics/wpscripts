@@ -168,12 +168,12 @@ def check_tools() -> None:
     Check for the tools if its installed: taxonkit, diamond
     """
     tools = ['taxonkit', 'diamond', 'wget', 'seqkit']
-    try:
-        for tool in tools:
-            shutil.which(tool)
-    except Exception as e:
-        logging.error(f"{tool} is not installed. Please install it and add it to the PATH")
-        sys.exit(1)
+    for tool in tools:
+        stdout, stderr = run_cmd(f"which {tool}")
+        if not stdout:
+            logging.error(f"{tool} is not installed. Please install it. mamba is recommended to install the tools.")
+            logging.error("Run the command: mamba install -c bioconda diamond taxonkit seqkit")
+            sys.exit(1)
 
 
 def wget(url, out_file) -> None:
@@ -399,16 +399,6 @@ def parse_args() -> argparse.Namespace:
     prepare_parser.add_argument('-t', '--taxids', help='taxid(s)', required=False, nargs='+', type=int)
     prepare_parser.add_argument('-p', '--threads', help='number of threads', required=False, type=int, default=2)
 
-    # add subcommand for running diamond search and classification
-    full_length_parser = subparsers.add_parser('full_length', help='run diamond search summarize full length isoforms',
-                                                description='run diamond search summarize full length isoforms')
-    full_length_parser.add_argument('-i', '--input', help='input fasta file', required=True)
-    full_length_parser.add_argument('-o', '--output', help='output file prefix', required=True)
-    full_length_parser.add_argument('-d', '--db_dir', help='diamond database directory (from prepare step)', required=True)
-    full_length_parser.add_argument('-n', '--name', help='database name', required=True)
-    full_length_parser.add_argument('-p', '--threads', help='number of threads', required=False, type=int, default=2)
-    full_length_parser.add_argument('-f', '--force', help='force to run the command', required=False, action='store_true')
-
     diamond_parser = subparsers.add_parser('diamond', help='run diamond search',
                                              description='run diamond search')
     diamond_parser.add_argument('-i', '--input', help='input fasta file', required=True)
@@ -527,8 +517,6 @@ def main() -> None:
     elif args.command == 'prepare':
         args.taxids = [int(taxid) for taxid in args.taxids]
         prepare_db(args.db_dir, args.name, args.threads, args.taxids)
-    elif args.command == 'full_length':
-        full_length_summarize(args.input, args.output, args.db_dir, args.name, args.threads, args.force)
     elif args.command == 'diamond':
         run_diamond(args.db_dir, args.input, args.force, args.name, args.threads, args.output)
     elif args.command == 'full_len_tr':
