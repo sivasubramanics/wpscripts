@@ -44,6 +44,37 @@ def read_gtf(gtf_file):
                 continue
             yield GTFline(line)
 
+
+def get_gene_to_tr_map(input, output):
+    """
+    Generate gene to transcript mapping
+    :param input: input GTF file
+    :param output: output table
+    :return: None
+    """
+    # if output is not specified, create one
+    if not output:
+        output = input + '.gene_to_transcript_map'
+
+    # create a dictionary to hold the gene to transcript mapping
+    gene_to_tr = defaultdict(list)
+
+    # read the GTF file and generate the gene to transcript mapping
+    logging.info(f"reading GTF file: {input}")
+    for record in read_gtf(input):
+        if record.feature == 'transcript':
+            gene_id = record.attribute_dict['gene_id']
+            transcript_id = record.attribute_dict['transcript_id']
+            gene_to_tr[gene_id].append(transcript_id)
+
+    # write the gene to transcript mapping to the output table
+    logging.info(f"writing gene to transcript mapping to: {output}")
+    with open(output, 'w') as out_fh:
+        for gene_id in gene_to_tr:
+            out_fh.write(gene_id + '\t' + ','.join(gene_to_tr[gene_id]) + '\n')
+    
+
+
 def main():
     # add command line arguments with subcommands
     parser = argparse.ArgumentParser(description='This is a utility script to process GTF files, and perform simple ooperations')
@@ -55,6 +86,10 @@ def main():
     density_parser.add_argument('-o', '--output', help='output table, if not specified, input.gtf.1mb.feature.density', required=False)
     density_parser.add_argument('-t', '--type', help='feature type (gene, transcript, exon)', required=True, type=str, choices=['gene', 'transcript', 'exon'])
     density_parser.add_argument('-m', '--mb', help='window size in MB', required=False, type=float, default=1)
+
+    gene_to_tr_map_parser = subparsers.add_parser('gene_to_tr_map', help='generate gene to transcript mapping', description='generate gene to transcript mapping')
+    gene_to_tr_map_parser.add_argument('-i', '--input', help='input GTF file', required=True)
+    gene_to_tr_map_parser.add_argument('-o', '--output', help='output table, if not specified, input.gtf.gene_to_transcript_map', required=False)
 
     # parse the arguments and save to args
     args = parser.parse_args(args=None if sys.argv[1:] else ['--help'])
@@ -71,6 +106,8 @@ def main():
     # if subcommand is density, call the density function
     if args.command == 'density':
         get_density(args.input, args.output, args.type, args.mb)
+    if args.command == 'gene_to_tr_map':
+        get_gene_to_tr_map(args.input, args.output)
 
 def get_density(in_gtf, out_table, feature, mb):
     """
