@@ -72,7 +72,7 @@ def get_gene_to_tr_map(input, output):
     with open(output, 'w') as out_fh:
         for gene_id in gene_to_tr:
             for trans_id in gene_to_tr[gene_id]:
-                out_fh.write(f"{gene_id}\{trans_id}\n")
+                out_fh.write(f"{gene_id}\t{trans_id}\n")
 
 
 
