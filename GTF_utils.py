@@ -71,8 +71,10 @@ def get_gene_to_tr_map(input, output):
     logging.info(f"writing gene to transcript mapping to: {output}")
     with open(output, 'w') as out_fh:
         for gene_id in gene_to_tr:
-            out_fh.write(gene_id + '\t' + ','.join(gene_to_tr[gene_id]) + '\n')
-    
+            for trans_id in gene_to_tr[gene_id]:
+                out_fh.write(f"{gene_id}\{trans_id}\n")
+
+
 
 
 def main():
