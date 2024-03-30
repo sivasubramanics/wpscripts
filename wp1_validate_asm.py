@@ -62,12 +62,12 @@ def parse_psl(psl_file):
             if q_name is None:
                 q_name = psl.q_name
             if psl.q_name != q_name:
-                sorted_psl_list = sorted(psl_list, key=lambda x: x.psl_score(), reverse=True)
+                sorted_psl_list = sorted(psl_list, key=lambda x: x.psl_score, reverse=True)
                 yield sorted_psl_list
                 psl_list = []
                 q_name = psl.q_name
             psl_list.append(psl)
-    sorted_psl_list = sorted(psl_list, key=lambda x: x.psl_score(), reverse=True)
+    sorted_psl_list = sorted(psl_list, key=lambda x: x.psl_score, reverse=True)
     yield sorted_psl_list
 
 
@@ -90,12 +90,12 @@ def main():
     best_hit_tsv_fh = open(best_hit_tsv, 'w')
     best_hit_tsv_fh.write("query\tq_len\ttarget\tt_len\tscore\tq_overage\tt_coverage\tidentity\tn_blocks\n")
     for psl_list in parse_psl(args.input):
-        best_hit_psl_fh.write(f"{str(psl_list[0])}\t{psl_list[0].psl_score()}\n")
+        best_hit_psl_fh.write(f"{str(psl_list[0])}\t{psl_list[0].psl_score}\n")
         best_hit_tsv_fh.write(f"{psl_list[0].q_name}"
                               f"\t{psl_list[0].q_size}"
                               f"\t{psl_list[0].t_name}"
                               f"\t{psl_list[0].t_size}"
-                              f"\t{psl_list[0].psl_score()}"
+                              f"\t{psl_list[0].psl_score}"
                               f"\t{round(psl_list[0].get_query_coverage() * 100, 2)}"
                               f"\t{round(psl_list[0].get_target_coverage() * 100, 2)}"
                               f"\t{round(psl_list[0].get_identity() * 100, 2)}"
