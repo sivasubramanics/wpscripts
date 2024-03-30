@@ -8,6 +8,11 @@ import argparse
 import sys
 from collections import defaultdict
 
+HEAD_SUMMARY = "qname\tqlen\ttname\ttstart\ttend\tstrand\tq_aln_len\tt_aln_len\tqcov\tidentity\tblockcount\tpslscore\tqscore"
+HEAD_LOCI = "qname\tnum_hits\tloci"
+HEAD_HITS = "qname\tnum_hits\tref_id"
+
+
 class PSL:
     def __init__(self, line):
         self.line = line.strip().split('\t')
@@ -32,6 +37,8 @@ class PSL:
         self.block_sizes = [int(x) for x in self.line[18].split(',') if x]
         self.q_starts = [int(x) for x in self.line[19].split(',') if x]
         self.t_starts = [int(x) for x in self.line[20].split(',') if x]
+        self.psl_score = self.matches + (self.rep_matches / 2) - self.mismatches - self.q_num_insert - self.t_num_insert
+        self.q_score = self.psl_score / self.q_size * 1000
 
     def get_query_coverage(self):
         return (self.matches + self.mismatches + self.rep_matches) / self.q_size
@@ -51,32 +58,28 @@ class PSL:
     def get_blocks_count(self):
         return self.block_count
 
-    def psl_score(self):
-        # my $pslScore = $sizeMul * ($matches + ( $repMatches >> 1) ) - $sizeMul * $misMatches - $qNumInsert - $tNumInsert;
-        return self.matches + (self.rep_matches / 2) - self.mismatches - self.q_num_insert - self.t_num_insert
-
     def to_summary(self):
         # return qname, qlen, tname, tstart, tend, strand, q_aln_len, t_aln_len, qcov, identity, blockcount, pslscore
-        return f"{self.q_name}\t{self.q_size}\t{self.t_name}\t{self.t_start}\t{self.t_end}\t{self.strand}\t{self.q_end - self.q_start}\t{self.t_end - self.t_start}\t{self.get_query_coverage()*100:.2f}\t{self.get_identity()*100:.2f}\t{self.block_count}\t{self.psl_score():.0f}"
+        return f"{self.q_name}\t{self.q_size}\t{self.t_name}\t{self.t_start}\t{self.t_end}\t{self.strand}\t{self.q_end - self.q_start}\t{self.t_end - self.t_start}\t{self.get_query_coverage() * 100:.2f}\t{self.get_identity() * 100:.2f}\t{self.block_count}\t{self.psl_score:.0f}\t{self.q_score:.0f}"
 
     def to_gtf(self):
         gtf_lines = []
-        gtf_score = self.psl_score() / self.q_size * 1000
         # transcript line
-        gtf_lines.append(f"{self.t_name}\tblat\ttranscript\t{self.t_start + 1}\t{self.t_end}\t{gtf_score:.0f}\t{self.strand}\t.\tgene_id \"{self.q_name}\"; transcript_id \"{self.q_name}\";")
+        gtf_lines.append(
+            f"{self.t_name}\tblat\ttranscript\t{self.t_start + 1}\t{self.t_end}\t{self.q_score:.0f}\t{self.strand}\t.\tgene_id \"{self.q_name}\"; transcript_id \"{self.q_name}\";")
         for i in range(self.block_count):
             # exon lines
-            gtf_lines.append(f"{self.t_name}\tblat\texon\t{self.t_starts[i] + 1}\t{self.t_starts[i] + self.block_sizes[i]}\t.\t{self.strand}\t.\tgene_id \"{self.q_name}\"; transcript_id \"{self.q_name}\";")
+            gtf_lines.append(
+                f"{self.t_name}\tblat\texon\t{self.t_starts[i] + 1}\t{self.t_starts[i] + self.block_sizes[i]}\t.\t{self.strand}\t.\tgene_id \"{self.q_name}\"; transcript_id \"{self.q_name}\";")
 
         return '\n'.join(gtf_lines)
 
     def to_bed(self):
-        bed_score = self.psl_score()/self.q_size*1000
         if self.strand == "+":
             rgb = "255,0,0"
         else:
             rgb = "0,0,255"
-        return f"{self.t_name}\t{self.t_start}\t{self.t_end}\t{self.q_name}\t{bed_score:.0f}\t{self.strand}\t{self.t_start}\t{self.t_end}\t{rgb}\t{self.block_count}\t{','.join([str(x) for x in self.block_sizes])}\t{','.join([str(x) for x in self.t_starts])}"
+        return f"{self.t_name}\t{self.t_start}\t{self.t_end}\t{self.q_name}\t{self.q_score:.0f}\t{self.strand}\t{self.t_start}\t{self.t_end}\t{rgb}\t{self.block_count}\t{','.join([str(x) for x in self.block_sizes])}\t{','.join([str(x) for x in self.t_starts])}"
 
 
 def parse_fasta(fasta_file):
@@ -114,19 +117,31 @@ def parse_psl(input):
             last_q_name = psl.q_name
         yield psls
 
-def genome_psl(input, out):
+
+def genome_psl(input, out, qscore_cutoff=0.0):
     """
     Parse the PSL file, get the best hit for each query and write coverage summary in output file
     """
     out_psl = open(f"{out}.psl", 'w')
     out_gtf = open(f"{out}.gtf", 'w')
     out_bed = open(f"{out}.bed", 'w')
+    out_loci = open(f"{out}.loci", 'w')
+    out_loci.write(f"{HEAD_LOCI}\n")
     out_summary = open(f"{out}.summary", 'w')
-    best_hit = []
+    out_summary.write(f"{HEAD_SUMMARY}\n")
+
+    best_hits = []
     for psls in parse_psl(input):
-        best_hit = best_hit_psl(psls)
-        for i in range(len(best_hit)):
-            psl = best_hit[i]
+        best_hits = best_hit_psl(psls)
+        loci = ""
+        q_name = best_hits[0].q_name
+        n_hits = 0
+        for i in range(len(best_hits)):
+            psl = best_hits[i]
+            if psl.q_score < qscore_cutoff:
+                continue
+            loci += f"{psl.t_name}:{psl.t_start}-{psl.t_end}:{psl.strand};"
+            n_hits += 1
             out_psl.write(f"{psl}\n")
             out_summary.write(f"{psl.to_summary()}\n")
             if i > 0:
@@ -134,8 +149,8 @@ def genome_psl(input, out):
                 psl.q_name = f"{psl.q_name}_{i}"
             out_gtf.write(f"{psl.to_gtf()}\n")
             out_bed.write(f"{psl.to_bed()}\n")
-
-
+        if loci:
+            out_loci.write(f"{q_name}\t{n_hits}\t{loci}\n")
 
 
 def best_hit_psl(psls):
@@ -148,11 +163,40 @@ def best_hit_psl(psls):
             best_psl = [psl]
         else:
             # check if the current psl has better score than the last element of best psl
-            if psl.psl_score() > best_psl[-1].psl_score():
+            if psl.psl_score > best_psl[-1].psl_score:
                 best_psl = [psl]
-            elif psl.psl_score() == best_psl[-1].psl_score():
+            elif psl.psl_score == best_psl[-1].psl_score:
                 best_psl.append(psl)
     return best_psl
+
+
+def protein_psl(input, out, cutoff_score=0.0):
+    """
+    Parse the PSL file, get the best hit for each query and write coverage summary in output file
+    """
+    out_psl = open(f"{out}.psl", 'w')
+    out_hits = open(f"{out}.hits", 'w')
+    out_hits.write(f"{HEAD_HITS}\n")
+    out_summary = open(f"{out}.summary", 'w')
+    out_summary.write(f"{HEAD_SUMMARY}\n")
+
+    best_hits = []
+    for psls in parse_psl(input):
+        best_hits = best_hit_psl(psls)
+        loci = ""
+        q_name = best_hits[0].q_name
+        n_hits = 0
+        for i in range(len(best_hits)):
+            psl = best_hits[i]
+            if psl.q_score < cutoff_score:
+                continue
+            loci += f"{psl.t_name};"
+            n_hits += 1
+            out_psl.write(f"{psl}\n")
+            out_summary.write(f"{psl.to_summary()}\n")
+        if loci:
+            out_hits.write(f"{q_name}\t{n_hits}\t{loci}\n")
+
 
 
 def main():
@@ -162,14 +206,17 @@ def main():
     filter_parser = subparsers.add_parser('filter', help='filter psl file', description='filter psl file')
     filter_parser.add_argument('-i', '--input', help='input psl file', required=True)
     filter_parser.add_argument('-o', '--output', help='output psl file', required=True)
-    filter_parser.add_argument('-q', '--query_coverage', help='query coverage threshold', required=False, type=float, default=0.4)
-    filter_parser.add_argument('-t', '--target_coverage', help='target coverage threshold', required=False, type=float, default=0.4)
+    filter_parser.add_argument('-q', '--query_coverage', help='query coverage threshold', required=False, type=float,
+                               default=0.4)
+    filter_parser.add_argument('-t', '--target_coverage', help='target coverage threshold', required=False, type=float,
+                               default=0.4)
     filter_parser.add_argument('-d', '--identity', help='identity threshold', required=False, type=float, default=0.9)
     filter_parser.add_argument('-b', '--max_blocks', help='max blocks threshold', required=False, type=int, default=100)
     filter_parser.add_argument('-x', '--query_fasta', help='query fasta file', required=False)
     filter_parser.add_argument('-y', '--target_fasta', help='target fasta file', required=False)
 
-    best_hit_parser = subparsers.add_parser('best_hit', help='retain only the best hit from the PSL file', description='retain only the best hit from the PSL file')
+    best_hit_parser = subparsers.add_parser('best_hit', help='retain only the best hit from the PSL file',
+                                            description='retain only the best hit from the PSL file')
     best_hit_parser.add_argument('-i', '--input', help='input psl file', required=True)
     best_hit_parser.add_argument('-o', '--output', help='output psl file', required=True)
 
@@ -181,6 +228,15 @@ def main():
                                               description='parse the PSL file, rna mapped on genome')
     genome_psl_parser.add_argument('-i', '--input', help='input psl file', required=True)
     genome_psl_parser.add_argument('-o', '--out', help='output prefix', required=True)
+    genome_psl_parser.add_argument('-s', '--cutoff_score', help='cutoff score (0-999)', required=False, type=float,
+                                   default=0.0)
+
+    protein_psl_parser = subparsers.add_parser('protein_psl', help='parse the PSL file, protein mapped on proteins',
+                                                description='parse the PSL file, protein mapped on proteins')
+    protein_psl_parser.add_argument('-i', '--input', help='input psl file', required=True)
+    protein_psl_parser.add_argument('-o', '--out', help='output prefix', required=True)
+    protein_psl_parser.add_argument('-s', '--cutoff_score', help='cutoff score (0-999)', required=False, type=float,
+                                    default=0.0)
 
     args = parser.parse_args(args=None if sys.argv[1:] else ['--help'])
 
@@ -191,7 +247,8 @@ def main():
             query_fasta = parse_fasta(args.query_fasta)
         if args.target_fasta:
             target_fasta = parse_fasta(args.target_fasta)
-        filter_psl(args.input, args.output, args.query_coverage, args.identity, args.max_blocks, query_fasta, target_fasta)
+        filter_psl(args.input, args.output, args.query_coverage, args.identity, args.max_blocks, query_fasta,
+                   target_fasta)
 
     if args.command == 'best_hit':
         best_hit(args.input, args.output)
@@ -200,7 +257,10 @@ def main():
         sort_psl(args.input, args.output)
 
     if args.command == 'genome_psl':
-        genome_psl(args.input, args.out)
+        genome_psl(args.input, args.out, args.cutoff_score)
+
+    if args.command == 'protein_psl':
+        protein_psl(args.input, args.out, args.cutoff_score)
 
 
 def filter_psl(in_file, out_file, query_coverage, identity, max_blocks, query_fasta=None, target_fasta=None):
@@ -227,10 +287,10 @@ def best_hit(in_file, out_file):
             psl = PSL(line)
             if psl.q_name == psl.t_name:
                 continue
-            h.write(f"{str(psl)}\t{psl.psl_score()}\n")
+            h.write(f"{str(psl)}\t{psl.psl_score}\n")
             if prev_q_name == psl.q_name:
                 psls.append(psl)
-                scores.append(psl.psl_score())
+                scores.append(psl.psl_score)
             else:
                 if psls:
                     max_score = max(scores)
@@ -241,7 +301,7 @@ def best_hit(in_file, out_file):
                     else:
                         g.write(str(psls[scores.index(max_score)]) + '\n')
                 psls = [psl]
-                scores = [psl.psl_score()]
+                scores = [psl.psl_score]
             prev_q_name = psl.q_name
 
 
@@ -254,14 +314,14 @@ def sort_psl(input, output):
             psl = PSL(line)
             if prev_q_name == psl.q_name:
                 psls.append(psl)
-                scores.append(psl.psl_score())
+                scores.append(psl.psl_score)
             else:
                 if psls:
                     psls = sort_lists(psls, scores)
                     for p in psls:
-                        g.write(f"{str(p)}\t{p.psl_score()}\n")
+                        g.write(f"{str(p)}\t{p.psl_score}\n")
                 psls = [psl]
-                scores = [psl.psl_score()]
+                scores = [psl.psl_score]
             prev_q_name = psl.q_name
 
 
@@ -269,7 +329,7 @@ def sort_lists(list_a, list_b):
     # Combine the two lists into tuples
     combined = zip(list_a, list_b)
 
-    #Reverse Sort the combined list based on the scores (second element of each tuple)
+    # Reverse Sort the combined list based on the scores (second element of each tuple)
     sorted_combined = sorted(combined, key=lambda x: x[1], reverse=True)
 
     # Extract the rearranged list_a
