@@ -414,12 +414,13 @@ def parse_args() -> argparse.Namespace:
     flt_parser.add_argument('-t', '--transcripts', help='transcripts fasta file', required=True)
     flt_parser.add_argument('-o', '--output', help='output file prefix', required=True)
     flt_parser.add_argument('-f', '--force', help='force to run the command', required=False, action='store_true')
+    flt_parser.add_argument('-e', '--extract', help='extract fasta files for each coverage', required=False, action='store_true')
 
     args = parser.parse_args(args=(sys.argv[1:] or ['--help']))
     return args
 
 
-def full_length_summarize(input, transcripts_fasta, out_prefix, is_force) -> None:
+def full_length_summarize(input, transcripts_fasta, out_prefix, is_force, extract_fasta=False) -> None:
     """
     run diamond and parse the output to calculate full length summary for isoforms
     """
@@ -436,7 +437,7 @@ def full_length_summarize(input, transcripts_fasta, out_prefix, is_force) -> Non
 
     summary_table = defaultdict()
     # parse the diamond output
-    with open(input, 'r') as f, open(diamond_cov, 'w') as out:
+    with open(input, 'r') as f:
         for line in f:
             line = line.strip().split()
             qseqid, sseqid, pident, length, mismatch, gapopen, qstart, qend, sstart, send, evalue, bitscore, qcov, scov, qlen, slen = line
@@ -462,13 +463,14 @@ def full_length_summarize(input, transcripts_fasta, out_prefix, is_force) -> Non
             percentage = len(summary_table[cov])/len(seq_dict)*100
             cum_percentage += percentage
             out.write(f"{cov}\t{len(summary_table[cov])}\t{percentage:.2f}\t{cum_percentage:.2f}\n")
-            sub_fasta = f"{out_prefix}.{cov}.fasta"
-            sub_ids = f"{out_prefix}.{cov}.ids"
-            with open(sub_ids, 'w') as f:
-                for seqid in summary_table[cov]:
-                    f.write(f"{seqid}\n")
-            run_cmd(f"seqkit grep -f {sub_ids} {transcripts_fasta} > {sub_fasta}")
-            os.remove(sub_ids)
+            if extract_fasta:
+                sub_fasta = f"{out_prefix}.{cov}.fasta"
+                sub_ids = f"{out_prefix}.{cov}.ids"
+                with open(sub_ids, 'w') as f:
+                    for seqid in summary_table[cov]:
+                        f.write(f"{seqid}\n")
+                run_cmd(f"seqkit grep -f {sub_ids} {transcripts_fasta} > {sub_fasta}")
+                os.remove(sub_ids)
         if seq_ids:
             percentage = len(seq_ids)/len(seq_dict)*100
             cum_percentage += percentage
@@ -520,7 +522,7 @@ def main() -> None:
     elif args.command == 'diamond':
         run_diamond(args.db_dir, args.input, args.force, args.name, args.threads, args.output)
     elif args.command == 'full_len_tr':
-        full_length_summarize(args.input, args.transcripts, args.output, args.force)
+        full_length_summarize(args.input, args.transcripts, args.output, args.force, args.extract)
     else:
         logging.error("Unknown command. Please check the help message.")
         sys.exit(1)
