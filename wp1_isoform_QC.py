@@ -54,8 +54,6 @@ class FASTA:
         return len(self.sequence)
 
 
-
-
 def parse_fasta(fasta_file) -> None:
     """
     Parse the fasta file
@@ -420,7 +418,7 @@ def parse_args() -> argparse.Namespace:
     return args
 
 
-def full_length_summarize(input, transcripts_fasta, out_prefix, is_force, extract_fasta=False) -> None:
+def full_length_summarize(input, transcripts_fasta, out_prefix, is_force, extract_fasta=False, make_plot=True) -> None:
     """
     run diamond and parse the output to calculate full length summary for isoforms
     """
@@ -485,6 +483,9 @@ def full_length_summarize(input, transcripts_fasta, out_prefix, is_force, extrac
     is_done(diamond_cov)
     logging.info(f"Full length isoform summary is written to {diamond_cov}")
 
+    if make_plot:
+        make_plot_full_length_summary(diamond_cov, f"{out_prefix}.full_length_summary.pdf", name=out_prefix)
+
 
 def run_diamond(db_dir, input, is_force, name, nthreads, out_prefix) -> str:
     diamond_out = f"{out_prefix}.dmnd.out"
@@ -526,6 +527,36 @@ def main() -> None:
     else:
         logging.error("Unknown command. Please check the help message.")
         sys.exit(1)
+
+
+def make_plot_full_length_summary(in_tsv, out_pdf, name=None):
+    if not name:
+        name = '.'.join(os.path.basename(in_tsv).split('.')[0:-1])
+    rscript = (f""
+               f"library(ggplot2)"
+               f"full_len_tr <- read.delim('{in_tsv}', header = TRUE)"
+                f"total_isoforms <- sum(full_len_tr$No_of_isoforms)"
+                f"ggplot(full_len_tr, aes(x = Coverage, y = percentage, fill = Coverage)) +"
+                f"geom_bar(stat = 'identity') +"
+                f"geom_text(aes(label = No_of_isoforms), size = 4, hjust = -0.5, fontface = 'bold') +"
+                f"labs(title = paste0('Full Length Transcripts - ', '{name}'),"
+                f"x = '% coverage',"
+                f"y = paste0('% transcripts (no of transcripts = ', total_isoforms, ')')) +"
+                f"scale_x_continuous(breaks = seq(0, 100, 10), labels = c('0', '0-10', '10-20', '20-30', '30-40', '40-50', '50-60', '60-70', '70-80', '80-90', '90-100')) +"
+                f"theme_classic() +"
+                f"theme(legend.position = 'none') +"
+                f"theme(plot.title = element_text(hjust = 0.5, face = 'bold', size = 20)) +"
+                f"theme(axis.title.x = element_text(size = 14)) +"
+                f"theme(axis.title.y = element_text(size = 14)) +"
+                f"coord_flip()"
+                f"ggsave('{out_pdf}', width=15, height=10, dpi=300)"
+               )
+    # create rscript file named as PID_fulllentr.R, PID is the process id
+    rscript_name = f"{os.getpid()}_full_len_tr.R"
+    with open(rscript_name, 'w') as f:
+        f.write(rscript)
+    run_cmd(f"Rscript {rscript_name}")
+    os.remove(rscript_name)
 
 
 if __name__ == "__main__":
