@@ -368,7 +368,7 @@ def prepare_db(db_dir, dbname, nthreads, taxids=None) -> None:
 
             no_seqs = run_cmd(f"wc -l {db_seqids}")[0].split()[0]
             run_cmd(f"seqkit grep -f {db_seqids} {unireffile} > {db_fasta}")
-            logging.info(f"Number of sequences to be included in the DB: {no_seqs:,}")
+            logging.info(f"Number of sequences to be included in the DB: {no_seqs}")
             is_done(db_fasta)
         # prepare the diamond database
         run_cmd(f"diamond makedb --in {db_fasta} -d {os.path.join(db_dir, dbname)}/{dbname}.dmnd -p {   nthreads}")
