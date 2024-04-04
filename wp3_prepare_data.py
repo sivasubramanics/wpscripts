@@ -44,7 +44,8 @@ def untar(in_dir):
                 files = stdout.split('\n')
                 for f in files:
                     if f:
-                        extracted_files.append(f"{os.path.dirname(tar_file)}/{f}")
+                        # append absolute path of extracted file
+                        extracted_files.append(os.path.join(root, f))
     return extracted_files
 
 def get_fastqs(in_dir):
