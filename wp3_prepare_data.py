@@ -38,9 +38,13 @@ def main():
         out.write('#accession\tsample\trep\tfq1\tfq2\n')
         for acc,sample,run,rep,fwd,rev in get_fastqs(args.input):
             os.makedirs(os.path.join(args.output, acc, sample, run), exist_ok=True)
-            os.symlink(fwd, os.path.join(args.output, acc, sample, run, f'{rep}_R1.fastq.gz'))
-            os.symlink(rev, os.path.join(args.output, acc, sample, run, f'{rep}_R2.fastq.gz'))
-            out.write(f'{acc}\t{sample}\t{rep}\t{os.path.join(acc, sample, run, f"{rep}_R1.fastq.gz")}\t{os.path.join(acc, sample, run, f"{rep}_R2.fastq.gz")}\n')
+            new_fwd = os.path.join(args.output, acc, sample, run, os.path.basename(fwd))
+            new_rev = os.path.join(args.output, acc, sample, run, os.path.basename(rev))
+            abs_fwd = os.path.abspath(fwd)
+            abs_rev = os.path.abspath(rev)
+            os.symlink(abs_fwd, new_fwd)
+            os.symlink(abs_rev, new_rev)
+            out.write(f'{acc}\t{sample}\t{rep}\t{os.path.abspath(new_fwd)}\t{os.path.abspath(new_rev)}\n')
 
 
 
