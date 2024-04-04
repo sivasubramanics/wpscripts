@@ -34,8 +34,14 @@ def main():
     # create output directory
     os.makedirs(args.output, exist_ok=True)
 
-    for meta_info in get_fastqs(args.input):
-        print(f"{meta_info[0]}\t{meta_info[1]}\t{meta_info[2]}\t{meta_info[3]}\t{meta_info[4]}\t{meta_info[5]}")
+    with open(os.path.join(args.output, 'metadata.tsv'), 'w') as out:
+        out.write('#accession\tsample\trep\tfq1\tfq2\n')
+        for acc,sample,run,rep,fwd,rev in get_fastqs(args.input):
+            os.makedirs(os.path.join(args.output, acc, sample, run), exist_ok=True)
+            os.symlink(fwd, os.path.join(args.output, acc, sample, run, f'{rep}_R1.fastq.gz'))
+            os.symlink(rev, os.path.join(args.output, acc, sample, run, f'{rep}_R2.fastq.gz'))
+            out.write(f'{acc}\t{sample}\t{rep}\t{os.path.join(acc, sample, run, f"{rep}_R1.fastq.gz")}\t{os.path.join(acc, sample, run, f"{rep}_R2.fastq.gz")}\n')
+
 
 
 if __name__ == '__main__':
