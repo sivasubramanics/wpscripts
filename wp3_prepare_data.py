@@ -40,7 +40,7 @@ def untar(in_dir):
         for file in files:
             if file.endswith('.tar'):
                 tar_file = os.path.join(root, file)
-                stdout, stderr = run_cmd(f'tar -xvf {tar_file}', message=f'Extracting {tar_file}')
+                stdout, stderr = run_cmd(f'tar -xvf {tar_file} -C {os.path.dirname(tar_file)}', f"Extracting {tar_file}")
                 files = stdout.split('\n')
                 for f in files:
                     if f:
