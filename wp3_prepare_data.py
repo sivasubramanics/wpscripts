@@ -18,7 +18,7 @@ def get_fastqs(in_dir):
                 rev = fwd.replace('_R1_001.fastq.gz', '_R2_001.fastq.gz')
                 if os.path.exists(rev):
                     # ideally the path for each fastq will be {sample_name}/{run_name}/{rep_name}_R1.fastq.gz
-                    acc_name = os.path.basename(os.path.dirname(root))
+                    acc_name = os.path.basename(os.path.dirname(os.path.dirname(os.path.dirname(fwd))))
                     sample_name = os.path.basename(os.path.dirname(os.path.dirname(fwd)))
                     run_name = os.path.basename(os.path.dirname(fwd))
                     rep_name = os.path.basename(fwd).replace('_R1_001.fastq.gz', '')
