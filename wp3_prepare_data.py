@@ -3,6 +3,45 @@
 
 import os
 import argparse
+import logging
+import subprocess
+import sys
+
+
+def run_cmd(cmd, message=None):
+    """
+    Run the command and return the stdout and stderr as string list as [stdout, stderr]
+    """
+    try:
+        if message:
+            logging.info(message)
+        logging.info(f"CMD: {cmd}")
+        process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdout, stderr = process.communicate()
+        stdout = stdout.decode('utf-8').strip()
+        stderr = stderr.decode('utf-8').strip()
+        run_code = process.returncode
+        if run_code != 0:
+            logging.error(f"Error running the command: {cmd}")
+            logging.error(f"Error: {stderr}")
+            sys.exit(1)
+        return stdout, stderr
+    except Exception as e:
+        logging.error(f"Error running the command: {cmd}")
+        logging.error(f"Error: {e}")
+        sys.exit(1)
+
+def untar(in_dir):
+    """
+    # extract all the tar files if it exists in any nexted directory. Make sure the tar extraction is done in the same directory where the tar file exists.
+    """
+    extracted_files = []
+    for root, dirs, files in os.walk(in_dir):
+        for file in files:
+            if file.endswith('.tar'):
+                tar_file = os.path.join(root, file)
+                stdout, strerr = run_cmd(f'tar -xvf {tar_file}', message=f'Extracting {tar_file}')
+                print(stdout)
 
 
 def get_fastqs(in_dir):
@@ -31,8 +70,15 @@ def main():
     parser.add_argument('-o', '--output', help='Output directory to store processed data', required=True)
     args = parser.parse_args()
 
+    # logging base config
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s',
+                        datefmt='%Y-%m-%d %H:%M:%S')
+
     # create output directory
     os.makedirs(args.output, exist_ok=True)
+
+    # extract all the tar files if it exists in any nexted directory
+    untar(args.input)
 
     with open(os.path.join(args.output, 'metadata.tsv'), 'w') as out:
         out.write('#accession\tsample\trep\tfq1\tfq2\n')
