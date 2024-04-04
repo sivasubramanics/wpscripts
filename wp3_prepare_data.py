@@ -40,9 +40,12 @@ def untar(in_dir):
         for file in files:
             if file.endswith('.tar'):
                 tar_file = os.path.join(root, file)
-                stdout, strerr = run_cmd(f'tar -xvf {tar_file}', message=f'Extracting {tar_file}')
-                print(stdout)
-
+                stdout, stderr = run_cmd(f'tar -xvf {tar_file}', message=f'Extracting {tar_file}')
+                files = stdout.split('\n')
+                for f in files:
+                    if f:
+                        extracted_files.append(f"{os.path.dirname(tar_file)}/{f}")
+    return extracted_files
 
 def get_fastqs(in_dir):
     """
@@ -78,11 +81,27 @@ def main():
     os.makedirs(args.output, exist_ok=True)
 
     # extract all the tar files if it exists in any nexted directory
-    untar(args.input)
+    extracted_file = untar(args.input)
+    if extracted_file:
+        with open(f"{args.output}/extracted_files.txt", 'w') as out:
+            for f in extracted_file:
+                out.write(f"{f}\n")
 
     with open(os.path.join(args.output, 'metadata.tsv'), 'w') as out:
         out.write('#accession\tsample\trep\tfq1\tfq2\n')
         for acc,sample,run,rep,fwd,rev in get_fastqs(args.input):
+            if not acc:
+                logging.error(f"Accession name not found for {fwd}")
+                sys.exit(1)
+            if not sample:
+                logging.error(f"Sample name not found for {fwd}")
+                sys.exit(1)
+            if not run:
+                logging.error(f"Run name not found for {fwd}")
+                sys.exit(1)
+            if not rep:
+                logging.error(f"Replicate name not found for {fwd}")
+                sys.exit(1)
             os.makedirs(os.path.join(args.output, acc, sample, run), exist_ok=True)
             new_fwd = os.path.join(args.output, acc, sample, run, os.path.basename(fwd))
             new_rev = os.path.join(args.output, acc, sample, run, os.path.basename(rev))
