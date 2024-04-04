@@ -31,6 +31,7 @@ def run_cmd(cmd, message=None):
         logging.error(f"Error: {e}")
         sys.exit(1)
 
+
 def untar(in_dir):
     """
     # extract all the tar files if it exists in any nexted directory. Make sure the tar extraction is done in the same directory where the tar file exists.
@@ -47,6 +48,7 @@ def untar(in_dir):
                         # append absolute path of extracted file
                         extracted_files.append(os.path.abspath(os.path.join(os.path.dirname(tar_file), f)))
     return extracted_files
+
 
 def get_fastqs(in_dir):
     """
