@@ -59,6 +59,7 @@ def main():
             if fasta.header in map_dict:
                 out.write(f">{map_dict[fasta.header]} {fasta.description}\n{fasta.fold()}\n")
 
-
+if __name__ == '__main__':
+    main()
 
 
