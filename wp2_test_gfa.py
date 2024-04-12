@@ -21,6 +21,7 @@ class GAF(object):
     """
     GAF object (referenced from GraphAligner output)
     """
+
     def __init__(self, line):
         line = line.strip().split('\t')
         self.read_name = line[0]
@@ -43,7 +44,7 @@ class GAF(object):
             else:
                 print(f"Duplicate tag {tag[0]} found in GAF file")
                 sys.exit(1)
-    
+
     def nodes(self):
         """
         Get the nodes from the path
@@ -57,7 +58,7 @@ class GAF(object):
                 nodes.append('')
                 i += 1
             else:
-                nodes[i-1] += char
+                nodes[i - 1] += char
         return directions, nodes
 
 
@@ -66,25 +67,26 @@ class FASTA(object):
         self.name = name
         self.sequence = sequence.upper()
         self.description = description
-    
+
     def __str__(self):
         return f">{self.name}\n{self.sequence}"
-    
+
     def __len__(self):
         return len(self.sequence)
-    
+
     def rev_complement(self):
         return FASTA(self.name, reverse_complement(self.sequence))
 
     def write_seq(self, handle):
         handle.write(f">{self.name}\n{self.sequence}\n")
-    
+
     def write_aln(self, handle, strand='+'):
         if len(self.name) > 20:
             name = self.name[:20]
         else:
-            name = self.name + " "*(20-len(self.name)) 
+            name = self.name + " " * (20 - len(self.name))
         handle.write(f"{name}\t{strand}\t{self.sequence}\n")
+
 
 class PSL(object):
     def __init__(self, line):
@@ -115,30 +117,34 @@ class PSL(object):
 
     def __str__(self):
         return ("\t".join(self.inline))
-    
+
     def write_psl(self, handle):
         inline = "\t".join(self.inline)
         handle.write(f"{inline}\n")
+
 
 class Segment:
     """
     Segment object (you can call it as Node as well)
     """
+
     def __init__(self, name, sequence):
         self.name = name
         self.sequence = sequence
         self.length = len(sequence)
-    
+
     def __str__(self):
         return f"S\t{self.name}\t{self.sequence}\tLN:i:{self.length}"
-    
+
     def __repr__(self):
         return str(self)
-    
+
+
 class Link:
     """
     Link object (you can call it as Edge as well)
     """
+
     def __init__(self, from_segment, from_strand, to_segment, to_strand, overlap):
         self.from_segment = from_segment
         self.to_segment = to_segment
@@ -148,47 +154,53 @@ class Link:
 
     def __str__(self):
         return f"L\t{self.from_segment}\t{self.from_strand}\t{self.to_segment}\t{self.to_strand}\t{self.overlap}"
-    
+
     def __repr__(self):
         return str(self)
-    
+
+
 class Path:
     """
     Path object
     """
+
     def __init__(self, name, segments, directions, overlaps):
         self.name = name
         self.segments = segments
         self.directions = directions
         self.overlaps = overlaps
-    
+
     def __str__(self):
-        return f"P\t{self.name}\t{','.join([s+d for s, d in zip(self.segments, self.directions)])}\t{','.join(self.overlaps)}"
-    
+        return f"P\t{self.name}\t{','.join([s + d for s, d in zip(self.segments, self.directions)])}\t{','.join(self.overlaps)}"
+
     def __repr__(self):
         return str(self)
-    
+
+
 class GFA:
     """
     GFA object
     May cause large memory usage if the gfa file is large
     """
+
     def __init__(self, segments, links, paths):
         self.segments = segments
         self.links = links
         self.paths = paths
 
     def __str__(self):
-        return "\n".join([str(segment) for segment in self.segments] + [str(link) for link in self.links] + [str(path) for path in self.paths])
-    
+        return "\n".join(
+            [str(segment) for segment in self.segments] + [str(link) for link in self.links] + [str(path) for path in
+                                                                                                self.paths])
+
     def __repr__(self):
         return str(self)
-    
+
     def summary(self):
         return (f"Number of segments: {len(self.segments)}\n"
                 f"Number of links: {len(self.links)}\n"
                 f"Number of paths: {len(self.paths)}")
-    
+
     def extract_path(self, path_name, output_file):
         print(f"Extracting path: {path_name}")
         path = [p for p in self.paths if p.name == path_name][0]
@@ -204,15 +216,17 @@ class GFA:
         segments = [s for s in self.segments if s.name in segment_names]
         links = [l for l in self.links if l.from_segment in segment_names or l.to_segment in segment_names]
         return GFA(segments, links, paths)
-    
+
     def write_to_file(self, filepath):
         with open(filepath, 'w') as file:
             file.write(str(self))
+
 
 class GFAParser:
     """
     GFA parser
     """
+
     def __init__(self, filepath):
         self.filepath = filepath
 
@@ -236,19 +250,21 @@ class GFAParser:
                     paths.append(Path(fields[1], seg_names, directions, overlaps))
         return GFA(segments, links, paths)
 
+
 class Blocks(object):
     """
     Blocks from PSL
     """
+
     def __init__(self, name):
         self.name = name
         self.block_seqs = []
         self.breaks = []
         self.path = []
-    
+
     def add_breaks(self, breaks):
         self.breaks.extend(breaks)
-    
+
     def update_block_seqs(self, sequence):
         self.breaks = list(sorted(set(self.breaks)))
         self.block_seqs = []
@@ -256,8 +272,8 @@ class Blocks(object):
             self.breaks.append(len(sequence))
         if self.breaks[0] != 0:
             self.breaks.insert(0, 0)
-        for i in range(len(self.breaks)-1):
-            seqs = sequence[self.breaks[i]:self.breaks[i+1]]
+        for i in range(len(self.breaks) - 1):
+            seqs = sequence[self.breaks[i]:self.breaks[i + 1]]
             # if len(seqs) > 256: # split into 256bp chunks since some of the gfa parsing tools doesn't accept the nodes longer than 256bp
             #     self.block_seqs.extend(split_segments(seqs))
             # else:
@@ -265,12 +281,13 @@ class Blocks(object):
             self.block_seqs.append(seqs)
 
     def get_links(self, handle):
-        for i in range(len(self.path)-1):
-            handle.write(f"L\t{self.path[i]}\t+\t{self.path[i+1]}\t+\t0M\n")
+        for i in range(len(self.path) - 1):
+            handle.write(f"L\t{self.path[i]}\t+\t{self.path[i + 1]}\t+\t0M\n")
 
     def write_path(self, handle):
-        handle.write(f"P\t{self.name}\t{','.join([str(x)+'+' for x in self.path])}\t{','.join(['0M' for x in self.path])}\n")
-    
+        handle.write(
+            f"P\t{self.name}\t{','.join([str(x) + '+' for x in self.path])}\t{','.join(['0M' for x in self.path])}\n")
+
 
 def reverse_complement(sequence):
     """
@@ -279,6 +296,7 @@ def reverse_complement(sequence):
     sequence = sequence.upper()
     complement = {'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A'}
     return "".join([complement[base] for base in sequence[::-1]])
+
 
 def parse_fasta(fasta_file):
     """
@@ -305,6 +323,7 @@ def parse_fasta(fasta_file):
                 sequence += line.strip()
         yield FASTA(name, sequence, description)
 
+
 def parse_psl(psl_file):
     """
     Parse a psl file
@@ -313,6 +332,7 @@ def parse_psl(psl_file):
         for line in f:
             line = line.strip().split("\t")
             yield PSL(line)
+
 
 def get_seq(sequence, blocks_sizes, block_starts):
     """
@@ -335,34 +355,44 @@ def get_seq(sequence, blocks_sizes, block_starts):
             seqs.append(sequence[block_end:])
         last_block_end = block_end
     return seqs
-        
+
+
 def split_segments(node_seq, chunk_size=256):
     """
     Split a sequence into 256bp chunks, since construction of vg index is limited to 256bp segments
     """
     chunks = []
     for i in range(0, len(node_seq), chunk_size):
-        chunks.append(node_seq[i:i+chunk_size])
+        chunks.append(node_seq[i:i + chunk_size])
     return chunks
+
 
 def get_breaks(psl_record):
     """
     Get the breaks from a block
     """
-    qbreaks = [0, psl_record.qSize] + [item for sublist in [[psl_record.qStarts[i], psl_record.qStarts[i] + psl_record.blockSizes[i]] for i in range(psl_record.blockCount)] for item in sublist]
-    
+    qbreaks = [0, psl_record.qSize] + [item for sublist in
+                                       [[psl_record.qStarts[i], psl_record.qStarts[i] + psl_record.blockSizes[i]] for i
+                                        in range(psl_record.blockCount)] for item in sublist]
+
     if psl_record.strand == '+':
-        tbreaks = [0, psl_record.tSize] + [item for sublist in [[psl_record.tStarts[i], psl_record.tStarts[i] + psl_record.blockSizes[i]] for i in range(psl_record.blockCount)] for item in sublist]
+        tbreaks = [0, psl_record.tSize] + [item for sublist in
+                                           [[psl_record.tStarts[i], psl_record.tStarts[i] + psl_record.blockSizes[i]]
+                                            for i in range(psl_record.blockCount)] for item in sublist]
     else:
-        tbreaks = [0, psl_record.tSize] + [item for sublist in [[psl_record.tSize - psl_record.tStarts[i], psl_record.tSize - psl_record.tStarts[i] - psl_record.blockSizes[i]] for i in range(psl_record.blockCount)] for item in sublist]
-    
+        tbreaks = [0, psl_record.tSize] + [item for sublist in [[psl_record.tSize - psl_record.tStarts[i],
+                                                                 psl_record.tSize - psl_record.tStarts[i] -
+                                                                 psl_record.blockSizes[i]] for i in
+                                                                range(psl_record.blockCount)] for item in sublist]
+
     return qbreaks, tbreaks
+
 
 def psl_to_gfa(args):
     """
     Convert a psl file to a gfa file
     """
-    
+
     if args.gfa.endswith('.gfa'):
         args.out = args.gfa.replace('.gfa', '')
     else:
@@ -377,13 +407,13 @@ def psl_to_gfa(args):
     transcript_direction = {}
     edges = open(f"{args.out}.edges.tsv", 'w')
     edges.write(f"query"
-                 f"\ttarget"
-                 f"\tqcoverage"
-                 f"\ttcoverage"
-                 f"\tnum_blocks"
-                 f"\tblock_size"
-                 f"\t{psl_head}\n")
-    
+                f"\ttarget"
+                f"\tqcoverage"
+                f"\ttcoverage"
+                f"\tnum_blocks"
+                f"\tblock_size"
+                f"\t{psl_head}\n")
+
     print_log(f"Parsing PSL file")
     for record in parse_psl(args.psl):
         if record.qName == record.tName:
@@ -417,7 +447,7 @@ def psl_to_gfa(args):
                     f"\t{record}\n")
         transcript_direction = update_strand_info(transcript_direction, record.qName, record.tName, record.strand)
     edges.close()
-    
+
     print_log(f"Parsing Segments")
     nodes = []
     seq_dict = {}
@@ -435,19 +465,19 @@ def psl_to_gfa(args):
           f"Number of nodes       : {len(nodes)}\n"
           f"--------------------------------")
 
-    gfa_out = open(args.gfa, 'w')    
+    gfa_out = open(args.gfa, 'w')
     print_log(f"Writing segments")
     for node in nodes:
-        gfa_out.write(f"S\t{nodes[node]+1}\t{node}\tLN:i:{len(node)}\n")
+        gfa_out.write(f"S\t{nodes[node] + 1}\t{node}\tLN:i:{len(node)}\n")
     gfa_out.flush()
 
     print_log(f"Writing links")
     for transcript_name in block_dict:
         for seq in enumerate(block_dict[transcript_name].block_seqs):
-            block_dict[transcript_name].path.append(nodes[seq[1]]+1)
+            block_dict[transcript_name].path.append(nodes[seq[1]] + 1)
         block_dict[transcript_name].get_links(gfa_out)
     gfa_out.flush()
-    
+
     print_log(f"Writing paths")
     for transcript_name in block_dict:
         block_dict[transcript_name].write_path(gfa_out)
@@ -465,8 +495,9 @@ def psl_to_gfa(args):
         g_id = f'group{i}'
         for node in component:
             clustered_transcripts.append(node)
-            output.write(f'{g_id}\t{node}\t{transcript_direction[node]}\t{len(seq_dict[node])}\tc\t{seq_dict[node].description}\n')
-    
+            output.write(
+                f'{g_id}\t{node}\t{transcript_direction[node]}\t{len(seq_dict[node])}\tc\t{seq_dict[node].description}\n')
+
     for seq in seq_dict:
         if seq not in clustered_transcripts:
             i += 1
@@ -474,17 +505,20 @@ def psl_to_gfa(args):
             output.write(f'{g_id}\t{seq}\t+\t{len(seq_dict[seq])}\tu\t{seq_dict[seq].description}\n')
     output.close()
 
+
 def index_dict(lst):
     """
     Index a list
     """
     return {v: k for k, v in enumerate(lst)}
 
+
 def time_from_start():
     """
     Get the time from start
     """
     return f"{seconds_to_hhmmss(int(time.time() - start_time))}"
+
 
 def export_path(args):
     """
@@ -496,6 +530,7 @@ def export_path(args):
     print_log(f"Extracting path: {args.path}")
     gfa.extract_path(args.path, args.out)
 
+
 def sub_graph(args):
     """
     Extract sub graph from gfa file
@@ -506,6 +541,7 @@ def sub_graph(args):
     print_log(f"Extracting sub graph for node: {args.node}")
     sub_gfa = gfa.sub_graph(args.node)
     sub_gfa.write_to_file(args.out)
+
 
 def extract_nodes(args):
     """
@@ -521,6 +557,7 @@ def extract_nodes(args):
         for segment in segments:
             file.write(f">{segment.name}\n")
             file.write(f"{fold(segment.sequence, 60)}\n")
+
 
 def aln_to_gfa(args):
     """
@@ -540,11 +577,12 @@ def aln_to_gfa(args):
         # do aling with vg map
         print_log("Aligning reads to graph")
         if fastq[1]:
-            run_cmd(f"vg map -x {args.index}.xg -g {args.index}.gcsa -t {args.threads} -f {fastq[0]} -f {fastq[1]} > {args.out}")
+            run_cmd(
+                f"vg map -x {args.index}.xg -g {args.index}.gcsa -t {args.threads} -f {fastq[0]} -f {fastq[1]} > {args.out}")
         else:
-            run_cmd(f"vg map -x {args.index}.xg -g {args.index}.gcsa -t {args.threads} -f {fastq[0]} > {args.out}")   
-        
-        # # do align using vg giraffe, check if index files exist with .dist extension and .min extension.
+            run_cmd(f"vg map -x {args.index}.xg -g {args.index}.gcsa -t {args.threads} -f {fastq[0]} > {args.out}")
+
+            # # do align using vg giraffe, check if index files exist with .dist extension and .min extension.
         # print_log("Aligning reads to graph")
         # if fastq[1]:
         #     run_cmd(f"vg giraffe -x {args.index}.xg -t {args.threads} --fastq-in {fastq[0]} --fastq-in {fastq[1]} -o gaf > {args.out}")
@@ -559,10 +597,12 @@ def aln_to_gfa(args):
         # do align using vg mpmap
         print_log("Aligning reads to graph")
         if fastq[1]:
-            run_cmd(f"vg mpmap --not-spliced --hit-max 100 -t {args.threads} -x {args.index}.xg -g {args.index}.gcsa -n DNA -f {fastq[0]} -f {fastq[1]} > {args.out}")
+            run_cmd(
+                f"vg mpmap --not-spliced --hit-max 100 -t {args.threads} -x {args.index}.xg -g {args.index}.gcsa -n DNA -f {fastq[0]} -f {fastq[1]} > {args.out}")
         else:
-            run_cmd(f"vg mpmap --not-spliced --hit-max 100 -t {args.threads} -x {args.index}.xg -g {args.index}.gcsa -n DNA -f {fastq[0]} > {args.out}")
-        
+            run_cmd(
+                f"vg mpmap --not-spliced --hit-max 100 -t {args.threads} -x {args.index}.xg -g {args.index}.gcsa -n DNA -f {fastq[0]} > {args.out}")
+
         if args.json:
             # convert gamp to json
             print_log("Converting gamp to json")
@@ -571,6 +611,7 @@ def aln_to_gfa(args):
         print(f"Output file must be either .gam or .gamp")
         sys.exit(1)
 
+
 def is_newer(file1, file2):
     """
     Check if file1 is newer than file2
@@ -578,6 +619,7 @@ def is_newer(file1, file2):
     ctime1 = os.path.getctime(file1)
     ctime2 = os.path.getctime(file2)
     return ctime1 > ctime2
+
 
 def check_vg_installed():
     """
@@ -588,6 +630,7 @@ def check_vg_installed():
     except FileNotFoundError:
         print("Tool vg not found in PATH. Please install vg")
         sys.exit(1)
+
 
 def run_cmd(cmd_line):
     """
@@ -600,11 +643,13 @@ def run_cmd(cmd_line):
         raise Exception(err)
     return out.decode('utf-8'), err.decode('utf-8')
 
+
 def fold(string, width):
     """
     Fold a string to a given width
     """
-    return "\n".join([string[i:i+width] for i in range(0, len(string), width)])
+    return "\n".join([string[i:i + width] for i in range(0, len(string), width)])
+
 
 def seconds_to_hhmmss(seconds):
     """
@@ -614,11 +659,12 @@ def seconds_to_hhmmss(seconds):
     h, m = divmod(m, 60)
     return f"{h:02d}:{m:02d}:{s:02d}"
 
+
 def index_gfa(args):
     if not args.gfa.endswith('.gfa'):
         print(f"Input file must be a gfa file. '.gfa' extension is required")
         sys.exit(1)
-    
+
     out = args.gfa.replace('.gfa', '')
     if not os.path.isfile(f"{out}.vg") or is_newer(f"{args.gfa}", f"{out}.vg"):
         print_log(f"Converting gfa to vg")
@@ -642,7 +688,7 @@ def index_gfa(args):
     else:
         print_log(f"Found gcsa file: {out}.gcsa")
         print_log(f"Skipping indexing .gcsa")
-    
+
     # if not os.path.isfile(f"{out}.dist") or is_newer(f"{out}.vg", f"{out}.dist"):
     #     print(f"Indexing vg -> dist")
     #     run_cmd(f"vg index --threads {args.threads} -j {out}.dist {out}.vg")
@@ -655,11 +701,13 @@ def index_gfa(args):
     #     print(f"Indexing vg -> min")
     #     run_cmd(f"vg minimizer --threads {args.threads} -g {out}.gbwt -d {out}.dist -o {out}.min {out}.vg")
 
+
 def print_log(msg):
     """
     Print log messages
     """
     print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {msg}", file=sys.stderr)
+
 
 def check_installed(tool):
     """
@@ -671,6 +719,7 @@ def check_installed(tool):
         print(f"Tool {tool} not found in PATH. Please install {tool}")
         sys.exit(1)
 
+
 def interleave_gaf(gaf1, gaf2, gaf):
     """
     Interleave two gaf files
@@ -680,6 +729,7 @@ def interleave_gaf(gaf1, gaf2, gaf):
         for line1, line2 in zip(f1, f2):
             fout.write(line1)
             fout.write(line2)
+
 
 def aln_to_gfa_ga(args):
     """
@@ -693,48 +743,53 @@ def aln_to_gfa_ga(args):
         print_log(f"ERROR: Maximum two fastq files are allowed")
         sys.exit(1)
     if args.fastq[1]:
-        run_cmd(f"GraphAligner -g {args.gfa} -f {args.fastq[0]} -t {args.threads} -a {args.out}.1.gaf -x vg --multimap-score-fraction 1")
-        run_cmd(f"GraphAligner -g {args.gfa} -f {args.fastq[1]} -t {args.threads} -a {args.out}.2.gaf -x vg  --multimap-score-fraction 1")
+        run_cmd(
+            f"GraphAligner -g {args.gfa} -f {args.fastq[0]} -t {args.threads} -a {args.out}.1.gaf -x vg --multimap-score-fraction 1")
+        run_cmd(
+            f"GraphAligner -g {args.gfa} -f {args.fastq[1]} -t {args.threads} -a {args.out}.2.gaf -x vg  --multimap-score-fraction 1")
         # interleave_gaf(f"{args.out}.1.gaf", f"{args.out}.2.gaf", f"{args.out}.gaf")
     else:
-        run_cmd(f"GraphAligner -g {args.gfa} -f {args.fastq[0]} -t {args.threads} -a {args.out}.gaf -x vg  --multimap-score-fraction 1")
+        run_cmd(
+            f"GraphAligner -g {args.gfa} -f {args.fastq[0]} -t {args.threads} -a {args.out}.gaf -x vg  --multimap-score-fraction 1")
+
 
 def update_strand_info(transcript_direction, qName, tName, strand):
     """
     Update the strand information from the psl file
     """
     # Directionality of both transcripts already defined
-    if((tName in transcript_direction) and (qName in transcript_direction)):
+    if ((tName in transcript_direction) and (qName in transcript_direction)):
         return transcript_direction
     # Transcript directiionality already defined
-    elif(tName in transcript_direction): 
+    elif (tName in transcript_direction):
         tdir = transcript_direction[tName]
-        if(tdir == strand): #If both the transcript and strand same
+        if (tdir == strand):  # If both the transcript and strand same
             transcript_direction[qName] = '+'
         else:
             transcript_direction[qName] = '-'
     # Query transcript already defined
-    elif(qName in transcript_direction): 
+    elif (qName in transcript_direction):
         qdir = transcript_direction[qName]
-        if(qdir == strand): # If both the query and strand same
+        if (qdir == strand):  # If both the query and strand same
             transcript_direction[tName] = '+'
         else:
             transcript_direction[tName] = '-'
     # Neither of the sequences defined
     else:
-        if(strand=='+'): # Both transcripts in the same direction
+        if (strand == '+'):  # Both transcripts in the same direction
             transcript_direction[qName] = '+'
             transcript_direction[tName] = '+'
 
-        else: # arbitrarily define transcript as postive and query as negative
+        else:  # arbitrarily define transcript as postive and query as negative
             transcript_direction[tName] = '+'
             transcript_direction[qName] = '-'
     return transcript_direction
 
+
 def get_sets(ilist, n):
     olist = []
-    for i in range(len(ilist)-n+1):
-        olist.append(tuple(ilist[i:i+n]))
+    for i in range(len(ilist) - n + 1):
+        olist.append(tuple(ilist[i:i + n]))
     return olist
 
 
@@ -759,7 +814,6 @@ def counts_from_gaf(args):
             if fields[0] not in counts:
                 counts[fields[0]] = {'count': 0, 'ambigus': 0, 'lengths': []}
             counts[fields[0]]['lengths'].append(int(fields[3]))
-            
 
     path_index = defaultdict(dict)
     for path in paths:
@@ -770,13 +824,12 @@ def counts_from_gaf(args):
                 break
             for node_set in get_sets(paths[path].segments, i):
                 path_index[node_set] = path
-            
-    
-    for path in paths:    
+
+    for path in paths:
         for node in paths[path].segments:
             if tr_to_cltr[path] not in node_to_clusters[node]:
                 node_to_clusters[node].append(tr_to_cltr[path])
-            
+
     for in_gaf in args.input:
         print_log(f"Extracting counts from gaf file: {in_gaf}")
         with open(in_gaf, 'r') as file:
@@ -808,13 +861,14 @@ def counts_from_gaf(args):
     ofh = open(f"{args.out}.counts", 'w')
     ofh.write(f"cluster\ttr_count\tmean_length\tcount\tambigus\n")
     for cluster in counts:
-        ofh.write(f"{cluster}\t{len(counts[cluster]['lengths'])}\t{int(sum(counts[cluster]['lengths'])/len(counts[cluster]['lengths']))}\t{counts[cluster]['count']}\t{counts[cluster]['ambigus']}\n")
-            
+        ofh.write(
+            f"{cluster}\t{len(counts[cluster]['lengths'])}\t{int(sum(counts[cluster]['lengths']) / len(counts[cluster]['lengths']))}\t{counts[cluster]['count']}\t{counts[cluster]['ambigus']}\n")
+
 
 def main():
     """
     Main function
-    """    
+    """
     # test commands
     # wp2_test_gfa.py psl_to_gfa -i rna.psl -f rna.fna -o rna.2.gfa -c 0.8 -b 4
     # wp2_test_gfa.py index -i rna.2.gfa -t 20
@@ -854,21 +908,25 @@ def main():
     index_parser = subparsers.add_parser('index', help='Index gfa file')
     index_parser.add_argument('-i', '--gfa', help='gfa file', required=True)
     index_parser.add_argument('-t', '--threads', help=f"number of threads [{nthreads}]", default=nthreads, type=int)
-    
+
     # parse arguments for "aln_to_gfa" command
     aln_to_gfa_parser = subparsers.add_parser('aln_to_gfa', help='algin fastq reads to gfa file')
     aln_to_gfa_parser.add_argument('-i', '--index', help='index prefix of .xg and .gcsa', required=True)
     aln_to_gfa_parser.add_argument('-f', '--fastq', help='fastq file, if paired end comma seperated', required=True)
     aln_to_gfa_parser.add_argument('-o', '--out', help='output file. either .gam or .gamp', required=True)
-    aln_to_gfa_parser.add_argument('-t', '--threads', help=f"number of threads [{nthreads}]", default=nthreads, type=int)
+    aln_to_gfa_parser.add_argument('-t', '--threads', help=f"number of threads [{nthreads}]", default=nthreads,
+                                   type=int)
     aln_to_gfa_parser.add_argument('-j', '--json', help='output json file', action='store_true')
 
     # parse arguments for "aln_to_gfa_ga" command
-    aln_to_gfa_ga_parser = subparsers.add_parser('aln_to_gfa_ga', help='algin fastq reads to gfa file using GraphAligner')
+    aln_to_gfa_ga_parser = subparsers.add_parser('aln_to_gfa_ga',
+                                                 help='algin fastq reads to gfa file using GraphAligner')
     aln_to_gfa_ga_parser.add_argument('-g', '--gfa', help='input GFA', required=True)
-    aln_to_gfa_ga_parser.add_argument('-f', '--fastq', help='fastq file, if paired end comma seperated', nargs='+', required=True)
+    aln_to_gfa_ga_parser.add_argument('-f', '--fastq', help='fastq file, if paired end comma seperated', nargs='+',
+                                      required=True)
     aln_to_gfa_ga_parser.add_argument('-o', '--out', help='output file prefix. .gaf', required=True)
-    aln_to_gfa_ga_parser.add_argument('-t', '--threads', help=f"number of threads [{nthreads}]", default=nthreads, type=int)
+    aln_to_gfa_ga_parser.add_argument('-t', '--threads', help=f"number of threads [{nthreads}]", default=nthreads,
+                                      type=int)
 
     # parse arguments for "counts_from_gaf" command
     counts_from_gaf_parser = subparsers.add_parser('counts_from_gaf', help='count reads per cluster from gaf file')
@@ -888,31 +946,31 @@ def main():
 
     if args.command == 'psl_to_gfa':
         psl_to_gfa(args)
-    
+
     if args.command == 'export_path':
         export_path(args)
 
-    if args.command == 'sub_graph':    
+    if args.command == 'sub_graph':
         sub_graph(args)
-    
+
     if args.command == 'extract_nodes':
         extract_nodes(args)
-    
+
     if args.command == 'index':
         index_gfa(args)
 
     if args.command == 'aln_to_gfa':
         aln_to_gfa(args)
-    
+
     if args.command == 'aln_to_gfa_ga':
         aln_to_gfa_ga(args)
 
     if args.command == 'counts_from_gaf':
         counts_from_gaf(args)
-    
+
     # if args.command is 'aln':
     #     aln(args)
-    
+
     # end clock
     end_time = time.time()
     print_log(f"Time taken: {seconds_to_hhmmss(int(end_time - start_time))}")

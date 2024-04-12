@@ -115,6 +115,5 @@ def main():
             out.write(f'{acc}\t{sample}\t{rep}\t{os.path.abspath(new_fwd)}\t{os.path.abspath(new_rev)}\n')
 
 
-
 if __name__ == '__main__':
     main()
