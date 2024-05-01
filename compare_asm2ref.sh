@@ -122,7 +122,19 @@ then
     prtlog "Skipping mapping, $sam_file already exists"
 else
     # check if the genome index exists
-    genome_idx=${genome}.mmi
+    # if genome variable ends with .fasta then remove it
+    if [[ $genome == *.fasta ]]
+    then
+        genome_idx=${genome%.fasta}.mmi
+    fi
+    if [[ $genome == *.fa ]]
+    then
+        genome_idx=${genome%.fa}.mmi
+    fi
+    if [[ $genome == *.fna ]]
+    then
+        genome_idx=${genome%.fna}.mmi
+    fi
     if [ -f $genome_idx ]
     then
         prtlog "Using pre-built genome index $genome_idx"
