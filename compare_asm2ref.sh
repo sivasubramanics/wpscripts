@@ -92,7 +92,8 @@ fi
 start_time=`date +%s`
 
 # if force is set then delete the output directory
-if [ $force -eq 1 ]
+if [ $force -eq 1 ]; then
+    prtlog "Removing output directory $outdir"
     run_cmd "rm -rf $outdir"
 fi
 
