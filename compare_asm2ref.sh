@@ -100,6 +100,7 @@ fi
 # create output directory if not exists
 run_cmd "mkdir -p $outdir"
 
+# output files
 sam_file=$outdir/aln.sam
 sam_file_chk=$outdir/aln.sam.ok
 psl_file=$outdir/aln.psl
