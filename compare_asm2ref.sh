@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 # This script will do the following steps,
 #   1. map the input transcirpt sequences to the reference genome using minimap2
 #   2. convert the output to PSL
