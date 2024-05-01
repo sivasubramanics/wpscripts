@@ -121,7 +121,15 @@ if [ -f $sam_file_chk ]
 then
     prtlog "Skipping mapping, $sam_file already exists"
 else
-    run_cmd "minimap2 -ax splice -C5 --secondary=no -t $threads $genome $transcripts | samtools view -F0x900 > $sam_file  2> $sam_file.log"
+    # check if the genome index exists
+    genome_idx=${genome}.mmi
+    if [ -f $genome_idx ]
+    then
+        prtlog "Using pre-built genome index $genome_idx"
+        run_cmd "minimap2 -ax splice -C5 --secondary=no -t $threads $genome_idx $transcripts | samtools view -F0x900 > $sam_file  2> $sam_file.log"
+    else
+        run_cmd "minimap2 -ax splice -C5 --secondary=no -t $threads $genome $transcripts | samtools view -F0x900 > $sam_file  2> $sam_file.log"
+    fi
     run_cmd "touch $sam_file_chk"
 fi
 
