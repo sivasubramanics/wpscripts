@@ -158,7 +158,7 @@ if [ -f $fa_mapped_chk ]
 then
     prtlog "Skipping extraction, $fa_mapped already exists"
 else
-    run_cmd "awk '{if($0~/^>/){s=substr($1,2); print s}}' $transcripts > $ids_all"
+    run_cmd "awk '{if(\$0~/^>/){s=substr(\$1,2); print s}}' $transcripts > $ids_all"
     run_cmd "cut -f1 ${gtf_file%.gtf}.loci | sed '1d' | sort | uniq > $ids_mapped"
     run_cmd "faSomeRecords $transcripts $ids_mapped $fa_mapped"
     run_cmd "touch $fa_mapped_chk"
