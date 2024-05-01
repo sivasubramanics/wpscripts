@@ -65,7 +65,7 @@ for tool in minimap2 gffcompare samtools psl-filter sam2psl.py; do
 done
 
 # parse arguments
-while getopts "g:t:a:o:h" opt; do
+while getopts "g:t:a:o:hfp:s:" opt; do
     case $opt in
         g) genome=$OPTARG;;
         t) transcripts=$OPTARG;;
