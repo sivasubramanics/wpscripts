@@ -140,7 +140,7 @@ then
     prtlog "Skipping filtering, $gtf_file already exists"
 else
     tmp_out_prefix=${gtf_file%.gtf}
-    run_cmd "psl-filter -i $psl_file -o $tmp_out_prefix -s $cutoff_score"
+    run_cmd "psl-filter genome_psl -i $psl_file -o $tmp_out_prefix -s $cutoff_score"
     run_cmd "touch $gtf_file_chk"
 fi
 
