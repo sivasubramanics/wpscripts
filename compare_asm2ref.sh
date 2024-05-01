@@ -190,7 +190,7 @@ then
     prtlog "Skipping extraction, $fa_unmapped already exists"
 else
     run_cmd "cat $ids_all $ids_mapped | sort | uniq -u > $ids_unmapped"
-    run_cmd "faSomeRecords $transcripts $ids_unmapped -exclude $fa_unmapped"
+    run_cmd "faSomeRecords $transcripts $ids_unmapped $fa_unmapped"
     run_cmd "touch $fa_unmapped_chk"
 fi
 
