@@ -231,7 +231,7 @@ case $ref_name in
         ref="GCF_000001635.27"
         ;;
     arabidopsis)
-        ref="GCF_000001735.4"
+        ref="GCF_000001735.2"
         ;;
     rice)
         ref="GCF_001433935.1"
@@ -249,7 +249,7 @@ case $ref_name in
         ref="GCF_002870075.4"
         ;;
     *)
-        echo "Error: reference genome $ref_name is not supported. Please choose one from 'yeast', 'fruitfly', 'human', 'mouse', 'arabidopsis', 'rice', 'zebrafish', 'maize', 'tomato', 'lettuce'"; 
+        echo "Error: reference genome $ref_name is not supported. Please choose one from 'yeast', 'fruitfly', 'human', 'mouse', 'arabidopsis', 'rice', 'zebrafish', 'maize', 'tomato', 'lettuce'";
         exit 1
         ;;
 esac
