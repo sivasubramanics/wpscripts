@@ -939,9 +939,6 @@ class CountMatrixParser:
                     self.data[attr_id][sample] = float(line[header.index(sample)])
 
 
-
-
-
 def main():
     start_time = datetime.now()
     parser = argparse.ArgumentParser(
