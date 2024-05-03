@@ -267,6 +267,7 @@ def assemble_clusters(base_dir, nthreads, spades_threads=4, spades_mem=12):
         clust_id = readids_file.split(".")[0]
         mem = int(((os.path.getsize(f"{os.path.join(base_dir, 'clusters', clust_id)}.1.fa") / 1024 / 1024) + (os.path.getsize(f"{os.path.join(base_dir, 'clusters', clust_id)}.2.fa") / 1024 / 1024)) * 24) + 1
         num_runs = int(nthreads / spades_threads) + 1
+        print(mem, num_runs, spades_threads)
         cmd = (f"rnaspades.py -o {os.path.join(base_dir, 'assemblies', clust_id)} "
                f"-1 {os.path.join(base_dir, 'clusters', clust_id)}.1.fa "
                f"-2 {os.path.join(base_dir, 'clusters', clust_id)}.2.fa "
