@@ -262,14 +262,14 @@ def assemble_clusters(base_dir, nthreads, spades_threads=4):
         if not readids_file.endswith(".readids"):
             continue
         clust_id = readids_file.split(".")[0]
-        mem = int(((os.path.getsize(f"{os.path.join(base_dir, 'clusters', clust_id)}.1.fa") / 1024 / 1024) + (os.path.getsize(f"{os.path.join(base_dir, 'clusters', clust_id)}.2.fa") / 1024 / 1024)) * 4) + 1
+        mem = int(((os.path.getsize(f"{os.path.join(base_dir, 'clusters', clust_id)}.1.fa") / 1024 / 1024) + (os.path.getsize(f"{os.path.join(base_dir, 'clusters', clust_id)}.2.fa") / 1024 / 1024)) * 12) + 1
         num_runs = int(nthreads / spades_threads) + 1
         cmd = (f"rnaspades.py -o {os.path.join(base_dir, 'assemblies', clust_id)} "
                f"-1 {os.path.join(base_dir, 'clusters', clust_id)}.1.fa "
                f"-2 {os.path.join(base_dir, 'clusters', clust_id)}.2.fa "
                f"--threads {spades_threads} --memory {mem}")
         with concurrent.futures.ThreadPoolExecutor(max_workers=num_runs) as executor:
-            executor.submit(run_cmd, cmd, os.path.join(base_dir, LOGDIR, f"asm_{clust_id}.log"), False)
+            executor.submit(run_cmd, cmd, os.path.join(base_dir, LOGDIR, f"asm_{clust_id}.log"), True)
         # # run_cmd(cmd, os.path.join(base_dir, LOGDIR, f"asm_{clust_id}.log")
 
 
