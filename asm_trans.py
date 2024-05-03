@@ -389,10 +389,16 @@ def main():
     logging.info("All the steps are completed")
     end_time = time.time()
     # get the total time taken in hh:mm:ss format
-    logging.info(f"Total time taken: {time.strftime('%H:%M:%S', time.gmtime(end_time - start_time))}")
+    logging.info(f"Total time taken: {seconds_to_hhmmss(end_time - start_time)}")
 
 
-
+def seconds_to_hhmmss(seconds):
+    """
+    Convert seconds to hh:mm:ss format
+    """
+    m, s = divmod(seconds, 60)
+    h, m = divmod(m, 60)
+    return f"{h:02d}:{m:02d}:{s:02d}"
 
 if __name__ == "__main__":
     main()
