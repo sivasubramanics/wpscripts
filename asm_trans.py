@@ -254,7 +254,7 @@ def fastq_to_fasta(in_fq, out_fa, read="fwd", nthreads=1):
         line_no += 1
 
 
-def assemble_clusters(base_dir, nthreads, spades_threads=4):
+def assemble_clusters(base_dir, nthreads, spades_threads=4, spades_mem=12):
     """
     read all the fasta file in the clusters directory and assemble them using rnaspades.py
     """
@@ -262,7 +262,7 @@ def assemble_clusters(base_dir, nthreads, spades_threads=4):
         if not readids_file.endswith(".readids"):
             continue
         clust_id = readids_file.split(".")[0]
-        mem = int(((os.path.getsize(f"{os.path.join(base_dir, 'clusters', clust_id)}.1.fa") / 1024 / 1024) + (os.path.getsize(f"{os.path.join(base_dir, 'clusters', clust_id)}.2.fa") / 1024 / 1024)) * 12) + 1
+        mem = int(((os.path.getsize(f"{os.path.join(base_dir, 'clusters', clust_id)}.1.fa") / 1024 / 1024) + (os.path.getsize(f"{os.path.join(base_dir, 'clusters', clust_id)}.2.fa") / 1024 / 1024)) * 24) + 1
         num_runs = int(nthreads / spades_threads) + 1
         cmd = (f"rnaspades.py -o {os.path.join(base_dir, 'assemblies', clust_id)} "
                f"-1 {os.path.join(base_dir, 'clusters', clust_id)}.1.fa "
