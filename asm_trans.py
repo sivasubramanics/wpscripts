@@ -8,6 +8,7 @@ import subprocess
 import gzip
 import concurrent.futures
 from collections import defaultdict
+from datetime import time
 
 TR_FQ = "in.fastq"
 TR_FA = "in.fasta"
@@ -294,6 +295,8 @@ def main():
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s',
                         datefmt='%Y-%m-%d %H:%M:%S')
 
+    start_time = time.time()
+
     # if output directory does not exist, create it
     if not os.path.exists(args.output):
         os.makedirs(args.output, exist_ok=True)
@@ -342,8 +345,9 @@ def main():
     with open(os.path.join(args.output, TR_RENAMED_FA), "w") as fo:
         for seq in parse_fasta(args.transcript):
             seq.description += f" old_name={seq.name}"
-            seq.name = clust_dict[seq.name]
-            fo.write(f"{seq}\n")
+            if seq.name in clust_dict:
+                seq.name = clust_dict[seq.name]
+                fo.write(f"{seq}\n")
 
     if os.path.exists(os.path.join(args.output, "fwd.fasta")) and os.path.exists(os.path.join(args.output, "rev.fasta")) and args.force is False:
         logging.info("Fasta files already exists. Skipping the conversion step")
@@ -377,8 +381,15 @@ def main():
     if os.path.exists(os.path.join(args.output, "assemblies", 'done')) and args.force is False:
         logging.info("Assemblies already exists. Skipping the assembly step")
     else:
+        # assemble the clusters
+        logging.info("Assembling the clusters")
         assemble_clusters(args.output, args.threads)
         run_cmd(f"touch {os.path.join(args.output, 'assemblies', 'done')}", None, False)
+
+    logging.info("All the steps are completed")
+    end_time = time.time()
+    # get the total time taken in hh:mm:ss format
+    logging.info(f"Total time taken: {time.strftime('%H:%M:%S', time.gmtime(end_time - start_time))}")
 
 
 
