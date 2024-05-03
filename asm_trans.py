@@ -261,6 +261,9 @@ def assemble_clusters(base_dir, nthreads, spades_threads=4, spades_mem=12):
     for readids_file in os.listdir(os.path.join(base_dir, "clusters")):
         if not readids_file.endswith(".readids"):
             continue
+        asm_out = os.path.join(base_dir, "assemblies", readids_file.split(".")[0], "transcripts.fasta")
+        if os.path.exists(asm_out):
+            continue
         clust_id = readids_file.split(".")[0]
         mem = int(((os.path.getsize(f"{os.path.join(base_dir, 'clusters', clust_id)}.1.fa") / 1024 / 1024) + (os.path.getsize(f"{os.path.join(base_dir, 'clusters', clust_id)}.2.fa") / 1024 / 1024)) * 24) + 1
         num_runs = int(nthreads / spades_threads) + 1
@@ -270,7 +273,6 @@ def assemble_clusters(base_dir, nthreads, spades_threads=4, spades_mem=12):
                f"--threads {spades_threads} --memory {mem}")
         with concurrent.futures.ThreadPoolExecutor(max_workers=num_runs) as executor:
             executor.submit(run_cmd, cmd, os.path.join(base_dir, LOGDIR, f"asm_{clust_id}.log"), True)
-        # # run_cmd(cmd, os.path.join(base_dir, LOGDIR, f"asm_{clust_id}.log")
 
 
 def main():
