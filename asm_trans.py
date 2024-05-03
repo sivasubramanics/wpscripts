@@ -253,6 +253,11 @@ def fastq_to_fasta(in_fq, out_fa, read="fwd", nthreads=1):
             fo.write(f">{fq_num} {pair}\n{seq}\n")
         line_no += 1
 
+def get_file_size(file):
+    """
+    Get the file size in GB
+    """
+    return os.path.getsize(file) / (1024 ** 3)
 
 def assemble_clusters(base_dir, nthreads, spades_threads=4, spades_mem=12):
     """
@@ -265,16 +270,14 @@ def assemble_clusters(base_dir, nthreads, spades_threads=4, spades_mem=12):
         if os.path.exists(asm_out):
             continue
         clust_id = readids_file.split(".")[0]
-        mem = int(((os.path.getsize(f"{os.path.join(base_dir, 'clusters', clust_id)}.1.fa") / 1024 / 1024) + (os.path.getsize(f"{os.path.join(base_dir, 'clusters', clust_id)}.2.fa") / 1024 / 1024)) * 24) + 1
+        mem = 10
         num_runs = int(nthreads / spades_threads) + 1
-        print(mem, num_runs, spades_threads)
         cmd = (f"rnaspades.py -o {os.path.join(base_dir, 'assemblies', clust_id)} "
                f"-1 {os.path.join(base_dir, 'clusters', clust_id)}.1.fa "
                f"-2 {os.path.join(base_dir, 'clusters', clust_id)}.2.fa "
                f"--threads {spades_threads} --memory {mem}")
         with concurrent.futures.ThreadPoolExecutor(max_workers=num_runs) as executor:
             executor.submit(run_cmd, cmd, os.path.join(base_dir, LOGDIR, f"asm_{clust_id}.log"), False)
-
 
 def main():
     parser = argparse.ArgumentParser(description="Assembly based on the clustering")
