@@ -272,7 +272,7 @@ def assemble_clusters(base_dir, nthreads, spades_threads=4, spades_mem=12):
                f"-2 {os.path.join(base_dir, 'clusters', clust_id)}.2.fa "
                f"--threads {spades_threads} --memory {mem}")
         with concurrent.futures.ThreadPoolExecutor(max_workers=num_runs) as executor:
-            executor.submit(run_cmd, cmd, os.path.join(base_dir, LOGDIR, f"asm_{clust_id}.log"), True)
+            executor.submit(run_cmd, cmd, os.path.join(base_dir, LOGDIR, f"asm_{clust_id}.log"), False)
 
 
 def main():
