@@ -8,7 +8,7 @@ import subprocess
 import gzip
 import concurrent.futures
 from collections import defaultdict
-from datetime import time
+import time
 
 TR_FQ = "in.fastq"
 TR_FA = "in.fasta"
