@@ -199,7 +199,7 @@ def sam_to_fq(in_sam, nthreads=1):
                 line[2] = "unmapped"
             if line[2] != last_ref and last_ref is not None:
                 readid_list_file = os.path.join(base_dir, 'clusters', f"{last_ref}.readids")
-                with open(readid_list_file, "w") as f:
+                with open(readid_list_file, "a") as f:
                     for readid in read_set:
                         f.write(f"{readid}\n")
                 read_set = set()
@@ -208,7 +208,7 @@ def sam_to_fq(in_sam, nthreads=1):
                 continue
             read_set.add(line[0])
         readid_list_file = os.path.join(base_dir, 'clusters', f"{last_ref}.readids")
-        with open(readid_list_file, "w") as f:
+        with open(readid_list_file, "a") as f:
             for readid in read_set:
                 f.write(f"{readid}\n")
         logging.info(f"Extracting fastq per cluster")
@@ -407,6 +407,8 @@ def main():
     else:
         # convert the sam file to fastq files
         logging.info("SAM to FASTQ conversion")
+        # remove all files under clusters directory
+        run_cmd(f"rm -rf {os.path.join(args.output, 'clusters', '*')}", None, False)
         sam_to_fq(os.path.join(args.output, ALN_SAM), args.threads)
         run_cmd(f"touch {os.path.join(args.output, 'clusters', 'done')}", None, False)
 
