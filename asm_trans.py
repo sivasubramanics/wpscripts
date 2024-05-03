@@ -221,8 +221,23 @@ def sam_to_fq(in_sam, nthreads=1):
 def extract_fasta(readid_list_file, base_dir):
     clust_id = readid_list_file.split(".")[0]
     # base_dir = os.path.dirname(readid_list_file).rsrip("clusters")
-    run_cmd(f"faSomeRecords {os.path.join(base_dir, 'fwd.fasta')} {os.path.join(base_dir, 'clusters', readid_list_file)} {os.path.join(base_dir, 'clusters', f'{clust_id}.1.fa')}", None, False)
-    run_cmd(f"faSomeRecords {os.path.join(base_dir, 'rev.fasta')} {os.path.join(base_dir, 'clusters', readid_list_file)} {os.path.join(base_dir, 'clusters', f'{clust_id}.2.fa')}", None, False)
+    run_cmd(
+        f"faSomeRecords {os.path.join(base_dir, 'fwd.fasta')} {os.path.join(base_dir, 'clusters', readid_list_file)} {os.path.join(base_dir, 'clusters', f'{clust_id}.1.fa')}",
+        None, False)
+    run_cmd(
+        f"faSomeRecords {os.path.join(base_dir, 'rev.fasta')} {os.path.join(base_dir, 'clusters', readid_list_file)} {os.path.join(base_dir, 'clusters', f'{clust_id}.2.fa')}",
+        None, False)
+
+
+def read_gzip_file(file, nthreads=1):
+    """
+    Read the gzip file and return the file object
+    """
+    cmd = f"rapidgzip -P {nthreads} -dkc {file}"
+    with subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True,
+                          shell=True) as proc:
+        for line in proc.stdout:
+            yield line
 
 
 def fastq_to_fasta(in_fq, out_fa, read="fwd", nthreads=1):
@@ -235,30 +250,45 @@ def fastq_to_fasta(in_fq, out_fa, read="fwd", nthreads=1):
         pair = 2
     else:
         raise Exception("Read should be either fwd or rev")
-    if in_fq.endswith(".gz"):
-        fq = gzip.open(in_fq, 'rb')
-    else:
-        fq = open(in_fq, "r")
-    fo = open(out_fa, "w")
     line_no = 0
     fq_num = 0
-    for line in fq:
-        line = line.strip()
-        if in_fq.endswith(".gz"):
-            line = line.decode()
-        if line_no % 4 == 0:
-            fq_num += 1
-        elif line_no % 4 == 1:
-            seq = line
-        elif line_no % 4 == 3:
-            fo.write(f">{fq_num} {pair}\n{seq}\n")
-        line_no += 1
+    if in_fq.endswith(".gz"):
+        # fq = gzip.open(in_fq, 'rb')
+        fo = open(out_fa, "w")
+        for line in read_gzip_file(in_fq, nthreads):
+            line = line.strip()
+            # if in_fq.endswith(".gz"):
+            #     line = line.decode()
+            if line_no % 4 == 0:
+                fq_num += 1
+            elif line_no % 4 == 1:
+                seq = line
+            elif line_no % 4 == 3:
+                fo.write(f">{fq_num} {pair}\n{seq}\n")
+            line_no += 1
+    else:
+        fq = open(in_fq, "r")
+        fo = open(out_fa, "w")
+        for line in fq:
+            line = line.strip()
+            if in_fq.endswith(".gz"):
+                line = line.decode()
+            if line_no % 4 == 0:
+                fq_num += 1
+            elif line_no % 4 == 1:
+                seq = line
+            elif line_no % 4 == 3:
+                fo.write(f">{fq_num} {pair}\n{seq}\n")
+            line_no += 1
+
+
 
 def get_file_size(file):
     """
     Get the file size in GB
     """
     return os.path.getsize(file) / (1024 ** 3)
+
 
 def assemble_clusters(base_dir, nthreads, spades_threads=4, spades_mem=10):
     """
@@ -280,6 +310,7 @@ def assemble_clusters(base_dir, nthreads, spades_threads=4, spades_mem=10):
             executor.submit(run_cmd, cmd, os.path.join(base_dir, LOGDIR, f"asm_{clust_id}.log"), False)
         # wait for all the threads to finish
         executor.shutdown(wait=True)
+
 
 def main():
     parser = argparse.ArgumentParser(description="Assembly based on the clustering")
@@ -349,7 +380,8 @@ def main():
                 seq.name = clust_dict[seq.name]
                 fo.write(f"{seq}\n")
 
-    if os.path.exists(os.path.join(args.output, "fwd.fasta")) and os.path.exists(os.path.join(args.output, "rev.fasta")) and args.force is False:
+    if os.path.exists(os.path.join(args.output, "fwd.fasta")) and os.path.exists(
+            os.path.join(args.output, "rev.fasta")) and args.force is False:
         logging.info("Fasta files already exists. Skipping the conversion step")
     else:
         # convert the fastq files to fasta
@@ -398,7 +430,8 @@ def seconds_to_hhmmss(seconds):
     """
     m, s = divmod(seconds, 60)
     h, m = divmod(m, 60)
-    return f"{h:02d}:{m:02d}:{s:02d}"
+    return f"{int(h):02d}:{int(m):02d}:{int(s):02d}"
+
 
 if __name__ == "__main__":
     main()
