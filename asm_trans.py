@@ -367,7 +367,11 @@ def main():
         sam_to_fq(os.path.join(args.output, ALN_SAM), args.threads)
         run_cmd(f"touch {os.path.join(args.output, 'clusters', 'done')}", None, False)
 
-    assemble_clusters(args.output, args.threads)
+    if os.path.exists(os.path.join(args.output, "assemblies", 'done')) and args.force is False:
+        logging.info("Assemblies already exists. Skipping the assembly step")
+    else:
+        assemble_clusters(args.output, args.threads)
+        run_cmd(f"touch {os.path.join(args.output, 'assemblies', 'done')}", None, False)
 
 
 
