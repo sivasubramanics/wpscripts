@@ -8,7 +8,7 @@ import argparse
 import sys
 from collections import defaultdict
 
-HEAD_SUMMARY = "qname\tqlen\ttname\ttstart\ttend\tstrand\tq_aln_len\tt_aln_len\tqcov\tidentity\tblockcount\tpslscore\tqscore"
+HEAD_SUMMARY = "qname\tqlen\ttname\ttstart\ttend\tstrand\tq_aln_len\tt_aln_len\tqcov\ttcov\tidentity\tblockcount\tpslscore\tqscore"
 HEAD_LOCI = "qname\tnum_hits\tloci"
 HEAD_HITS = "qname\tnum_hits\tref_id"
 
@@ -60,7 +60,7 @@ class PSL:
 
     def to_summary(self):
         # return qname, qlen, tname, tstart, tend, strand, q_aln_len, t_aln_len, qcov, identity, blockcount, pslscore
-        return f"{self.q_name}\t{self.q_size}\t{self.t_name}\t{self.t_start}\t{self.t_end}\t{self.strand}\t{self.q_end - self.q_start}\t{self.t_end - self.t_start}\t{self.get_query_coverage() * 100:.2f}\t{self.get_identity() * 100:.2f}\t{self.block_count}\t{self.psl_score:.0f}\t{self.q_score:.0f}"
+        return f"{self.q_name}\t{self.q_size}\t{self.t_name}\t{self.t_start}\t{self.t_end}\t{self.strand}\t{self.q_end - self.q_start}\t{self.t_end - self.t_start}\t{self.get_query_coverage() * 100:.2f}\t{self.get_target_coverage() * 100:.2f}\t{self.get_identity() * 100:.2f}\t{self.block_count}\t{self.psl_score:.0f}\t{self.q_score:.0f}"
 
     def to_gtf(self):
         gtf_lines = []
