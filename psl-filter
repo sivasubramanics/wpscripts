@@ -135,7 +135,7 @@ def genome_psl(input, out, qscore_cutoff=0.0):
 
     best_hits = []
     for psls in parse_psl(input):
-        best_hits = best_hit_psl(psls)
+        best_hits = sorted_psl(psls)
         loci = ""
         q_name = best_hits[0].q_name
         n_hits = 0
@@ -173,6 +173,12 @@ def best_hit_psl(psls):
     return best_psl
 
 
+def sorted_psl(psls):
+    """
+    Sort the PSL objects based on the score
+    """
+    return sorted(psls, key=lambda x: x.psl_score, reverse=True)
+
 def protein_psl(input, out, cutoff_score=0.0):
     """
     Parse the PSL file, get the best hit for each query and write coverage summary in output file
@@ -185,7 +191,7 @@ def protein_psl(input, out, cutoff_score=0.0):
 
     best_hits = []
     for psls in parse_psl(input):
-        best_hits = best_hit_psl(psls)
+        best_hits = sorted_psl(psls)
         loci = ""
         q_name = best_hits[0].q_name
         n_hits = 0
