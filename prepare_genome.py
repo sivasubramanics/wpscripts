@@ -38,12 +38,14 @@ def main():
 
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 
+    TAB = '\t'
+
 
     # read dictionary file
     name_dict = defaultdict()
     with open(args.dict, 'r') as f:
         for line in f:
-            line = line.strip().split('\t')
+            line = line.strip().split(TAB)
             if len(line) != 2:
                 logging.error(f"Dictionary file must have two columns: {args.dict}")
                 sys.exit(1)
@@ -88,10 +90,10 @@ def main():
                 if line.startswith('#'):
                     out.write(line)
                 else:
-                    line = line.strip().split('\t')
+                    line = line.strip().split(TAB)
                     if line[0] in name_dict:
                         line[0] = name_dict[line[0]]
-                    out.write(f"{'\t'.join(line)}\n")
+                    out.write(f"{TAB.join(line)}\n")
         open(f"{genome_gff}.ok", 'w').close()
 
     if not os.path.exists(f"{genome_gtf}.ok") or not os.path.exists(f"{genome_gtf}"):
@@ -112,7 +114,7 @@ def main():
     protein_ids = defaultdict()
     with open(genome_tsv, 'r') as f:
         for line in f:
-            line = line.strip().split('\t')
+            line = line.strip().split(TAB)
             if line[0] == 'seq_id':
                 id_idx = line.index('ID')
                 continue
