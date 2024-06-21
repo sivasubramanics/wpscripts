@@ -151,7 +151,6 @@ def main():
                         name = line[0][1:].replace('rna-', '')
                         if not name in rna_ids:
                             logging.warning(f"RNA id {name} not found in genome tsv file. Maybe the ID is different in the gff file.")
-                            sys.exit(1)
                         out.write(f">{name}\n")
                     else:
                         out.write(line)
@@ -176,7 +175,6 @@ def main():
                         name = line[0][1:].replace('rna-', '')
                         if not name in protein_ids:
                             logging.warning(f"Protein id {name} not found in genome tsv file. Maybe the ID is different in the gff file.")
-                            sys.exit(1)
                         out.write(f">{name}\n")
                     else:
                         out.write(line)
