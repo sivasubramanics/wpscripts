@@ -150,14 +150,39 @@ def main():
                         line = line.strip().split(' ')
                         name = line[0][1:].replace('rna-', '')
                         if not name in rna_ids:
-                            logging.error(f"RNA id {name} not found in genome tsv file")
+                            logging.warning(f"RNA id {name} not found in genome tsv file. Maybe the ID is different in the gff file.")
                             sys.exit(1)
                         out.write(f">{name}\n")
                     else:
                         out.write(line)
             open(f"{genome_rna}.ok", 'w').close()
-            # os.remove(f"{genome_rna}.bak")
-            # os.remove(f"{genome_rna}.bak.ok")
+            os.remove(f"{genome_rna}.bak")
+            os.remove(f"{genome_rna}.bak.ok")
+
+    if not os.path.exists(f"{genome_protein}.ok") or not os.path.exists(f"{genome_protein}"):
+        if not args.protein:
+            if not os.path.exists(f"{genome_protein}.bak") or not os.path.exists(f"{genome_protein}.bak.ok"):
+                logging.info("Protein fasta file not provided. Extracting protein sequences from genome fasta and gff file")
+                cmd = f"agat_sp_extract_sequences.pl --gff {genome_gff} --fasta {genome_fasta} --protein --output {genome_protein}.bak > {genome_protein}.log 2>&1"
+                run_cmd(cmd)
+                open(f"{genome_protein}.bak.ok", 'w').close()
+            args.protein = f"{genome_protein}.bak"
+        if args.protein:
+            logging.info(f"Creating protein fasta file: {genome_protein}")
+            with open(args.protein, 'r') as f, open(genome_protein, 'w') as out:
+                for line in f:
+                    if line.startswith('>'):
+                        line = line.strip().split(' ')
+                        name = line[0][1:].replace('rna-', '')
+                        if not name in protein_ids:
+                            logging.warning(f"Protein id {name} not found in genome tsv file. Maybe the ID is different in the gff file.")
+                            sys.exit(1)
+                        out.write(f">{name}\n")
+                    else:
+                        out.write(line)
+            open(f"{genome_protein}.ok", 'w').close()
+            os.remove(f"{genome_protein}.bak")
+            os.remove(f"{genome_protein}.bak.ok")
 
 
 if __name__ == '__main__':
