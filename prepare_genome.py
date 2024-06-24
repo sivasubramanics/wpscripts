@@ -177,6 +177,8 @@ def main():
                             logging.warning(f"Protein id {name} not found in genome tsv file. Maybe the ID is different in the gff file.")
                         out.write(f">{name}\n")
                     else:
+                        if line.endswith('*'):
+                            line = line[:-1]
                         out.write(line)
             open(f"{genome_protein}.ok", 'w').close()
             os.remove(f"{genome_protein}.bak")
