@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # if local host ends with .bioinformatics.nl then run the below command
 if [[ $(hostname) == *.bioinformatics.nl ]]; then
     java -jar "/lustre/BIF/nobackup/selva001/work/jars/meganome-0.0.1-SNAPSHOT.jar" "$@"
