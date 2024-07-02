@@ -77,6 +77,8 @@ def parse_uniref_desc(desc):
     parts = desc.split()
     parsed_data = {}
 
+    print(desc)
+    print(parts)
     desc_parts = []
     for part in parts:
         if part.startswith("n="):
