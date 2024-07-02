@@ -87,6 +87,10 @@ def parse_uniref_desc(desc):
     parsed_data['desc'] = ' '.join(desc_parts)
     # Iterate over the remaining parts and parse them
     for part in parts[len(desc_parts):]:
+        if '=' not in part:
+            # merge the last part with the current part
+            parsed_data[list(parsed_data.keys())[-1]] += ' ' + part
+            continue
         key, value = part.split('=')
         parsed_data[key] = value
     return parsed_data
