@@ -34,11 +34,24 @@ seconds_to_hhmmss() {
   echo "$hours:$minutes:$seconds"
 }
 
+usage(){
+    echo "Usage: runSTAR.sh [-h] [-f read_1.fq.gz] [-r read_2.fq.gz] [-o output_dir] [-g genome_dir] [-s genome.fasta] [-t threads]"
+    echo "Options:"
+    echo "  -f STR    read 1 fastq file (gzipped)"
+    echo "  -r STR    read 2 fastq file (gzipped)"
+    echo "  -o STR    output directory"
+    echo "  -g STR    STAR genome directory"
+    echo "  -s STR    genome fasta file"
+    echo "  -t INT    number of threads"
+    echo "  -h        help"
+    exit 1
+}
+
 # parse arguments
 while getopts ":hf:r:o:g:t:s:" opt; do
     case $opt in
         h)
-            echo "Usage: runSTAR.sh [-h] [-f read_1.fq.gz] [-r read_2.fq.gz] [-o output_dir] [-g genome_dir] [-t threads]"
+            usage
             exit 1
             ;;
         f)
@@ -73,7 +86,7 @@ done
 # check if required arguments are provided
 if [ -z "$READ1" ] || [ -z "$READ2" ] || [ -z "$OUT_DIR" ] || [ -z "$GENOME_DIR" ] || [ -z "$GENOME_FASTA" ]; then
     echo "Error: missing required arguments" 1>&2
-    echo "Usage: runSTAR.sh [-h] [-f read_1.fq.gz] [-r read_2.fq.gz] [-o output_dir] [-g genome_dir] [-s genome.fasta] [-t threads]" 1>&2
+    usage
     exit 1
 fi
 
