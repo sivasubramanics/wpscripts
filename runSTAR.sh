@@ -107,26 +107,47 @@ for tool in STAR samtools; do
     fi
 done
 
+if [ -f "$OUT_DIR/pass2/Aligned.sortedByCoord.out.bam.bai.ok" ]; then
+    print_log "STAR already completed"
+    exit 0
+fi
+
 # create output directory
 mkdir -p $OUT_DIR/pass1 $OUT_DIR/pass2 $OUT_DIR/genome_idx
 
-print_log "Running STAR pass 1"
-run_cmd "STAR --runThreadN $THREADS --genomeDir $GENOME_DIR --readFilesIn $READ1 $READ2 --readFilesCommand zcat --outFileNamePrefix $OUT_DIR/pass1/ --outSAMtype BAM Unsorted > $OUT_DIR/pass1.log 2>&1"
+if [ ! -f "$OUT_DIR/pass1/Aligned.out.bam.ok" ]; then
+    print_log "Running STAR pass 1"
+    run_cmd "STAR --runThreadN $THREADS --genomeDir $GENOME_DIR --readFilesIn $READ1 $READ2 --readFilesCommand zcat --outFileNamePrefix $OUT_DIR/pass1/ --outSAMtype BAM Unsorted > $OUT_DIR/pass1.log 2>&1"
+    touch $OUT_DIR/pass1/Aligned.out.bam.ok
+else
+    print_log "STAR pass 1 already completed"
+fi
 
-print_log "filter low coverage junctions"
-run_cmd "cat $OUT_DIR/pass1/SJ.out.tab | awk '{{ if (\$7 >= 3) print \$0}}' | sort -k1,1 -k2,2n | uniq > $OUT_DIR/pass1/junctions.txt 2> {log}"
+if [ ! -f "$OUT_DIR/genome_idx/pass1.index.ok" ]; then
+    print_log "Filter low coverage junctions"
+    run_cmd "cat $OUT_DIR/pass1/SJ.out.tab | awk '{{ if (\$7 >= 3) print \$0}}' | sort -k1,1 -k2,2n | uniq > $OUT_DIR/pass1/junctions.txt 2> $OUT_DIR/pass1/filter_junctions.log"
+    print_log "Regenerate genome index"
+    run_cmd "STAR --runThreadN $THREADS --runMode genomeGenerate --genomeDir $OUT_DIR/genome_idx --genomeFastaFiles $GENOME_FASTA --sjdbFileChrStartEnd $OUT_DIR/pass1/junctions.txt --sjdbOverhang 100 > $OUT_DIR/genome_idx.log 2>&1"
+    run_cmd "mv $OUT_DIR/pass1/junctions.txt $OUT_DIR/pass2/pass1_junctions.txt"
+    touch $OUT_DIR/genome_idx/pass1.index.ok
+else
+    print_log "Genome index already generated"
+fi 
 
-print_log "Regenerate genome index"
-run_cmd "STAR --runThreadN $THREADS --runMode genomeGenerate --genomeDir $OUT_DIR/genome_idx --genomeFastaFiles $GENOME_FASTA --sjdbFileChrStartEnd $OUT_DIR/pass1/junctions.txt --sjdbOverhang 100 > $OUT_DIR/genome_idx.log 2>&1"
+if [ ! -f "$OUT_DIR/pass2/Aligned.sortedByCoord.out.bam.ok" ]; then
+    print_log "Running STAR pass 2"
+    run_cmd "STAR --runThreadN $THREADS --genomeDir $OUT_DIR/genome_idx --readFilesIn $READ1 $READ2 --readFilesCommand zcat --outFileNamePrefix $OUT_DIR/pass2/ --outSAMtype BAM SortedByCoordinate > $OUT_DIR/pass2.log 2>&1"
+    touch $OUT_DIR/pass2/Aligned.sortedByCoord.out.bam.ok
+else
+    print_log "STAR pass 2 already completed"
+fi
 
-print_log "Running STAR pass 2"
-run_cmd "STAR --runThreadN $THREADS --genomeDir $OUT_DIR/genome_idx --readFilesIn $READ1 $READ2 --readFilesCommand zcat --outFileNamePrefix $OUT_DIR/pass2/ --outSAMtype BAM SortedByCoordinate > $OUT_DIR/pass2.log 2>&1"
-
-print_log "Indexing BAM file"
-run_cmd "samtools index -@ $THREADS $OUT_DIR/pass2/Aligned.sortedByCoord.out.bam"
-
-print_log "Moving junctions.txt to output directory"
-run_cmd "mv $OUT_DIR/pass1/junctions.txt $OUT_DIR/pass2/pass1_junctions.txt"
+if [ ! -f "$OUT_DIR/pass2/Aligned.sortedByCoord.out.bam.bai.ok" ]; then
+    print_log "Indexing BAM file"
+    run_cmd "samtools index -@ $THREADS $OUT_DIR/pass2/Aligned.sortedByCoord.out.bam"
+else
+    print_log "BAM file already indexed"
+fi
 
 print_log "Removing intermediate files"
 run_cmd "rm -rf $OUT_DIR/pass1 $OUT_DIR/genome_idx"
