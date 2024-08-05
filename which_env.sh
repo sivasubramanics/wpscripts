@@ -6,8 +6,14 @@
 
 set -u
 set -e
+set -o pipefail 
 
-env_file="/lustre/BIF/nobackup/selva001/work/envs/env.tools"
+# check if /lustre/BIF/nobackup/selva001/ exists
+if [[ ! -d "/lustre/BIF/nobackup/selva001/" ]]; then
+    env_file="/Users/selva001/opt/envs/env.tools"
+else
+    env_file="/lustre/BIF/nobackup/selva001/work/envs/env.tools"
+fi
 
 echoerr() { echo "$@" 1>&2; }
 
