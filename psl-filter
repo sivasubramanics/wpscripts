@@ -328,7 +328,7 @@ def sort_psl(input, output):
                 if psls:
                     psls = sort_lists(psls, scores)
                     for p in psls:
-                        g.write(f"{str(p)}\t{p.psl_score}\n")
+                        g.write(f"{str(p)}\t{p.psl_score}\t{p.q_score}\n")
                 psls = [psl]
                 scores = [psl.psl_score]
             prev_q_name = psl.q_name
