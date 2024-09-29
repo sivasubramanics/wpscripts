@@ -38,7 +38,7 @@ class PSL:
         self.q_starts = [int(x) for x in self.line[19].split(',') if x]
         self.t_starts = [int(x) for x in self.line[20].split(',') if x]
         self.psl_score = self.matches + (self.rep_matches / 2) - self.mismatches - self.q_num_insert - self.t_num_insert
-        self.q_score = self.psl_score / self.q_size * 1000
+        self.q_score = round(self.psl_score / self.q_size * 1000, 2)
 
     def get_query_coverage(self):
         return (self.matches + self.mismatches + self.rep_matches) / self.q_size
