@@ -296,7 +296,7 @@ def best_hit(in_file, out_file):
             psl = PSL(line)
             if psl.q_name == psl.t_name:
                 continue
-            h.write(f"{str(psl)}\t{psl.psl_score}\n")
+            h.write(f"{str(psl)}\t{psl.psl_score}\t{psl.q_score}\n")
             if prev_q_name == psl.q_name:
                 psls.append(psl)
                 scores.append(psl.psl_score)
