@@ -96,10 +96,10 @@ print_log "Creating output directory $output"
 mkdir -p $output
 
 print_log "KMC canonized counting"
-run_cmd "kmc -k$kmer_size -t$threads -ci0 ${in_cmd} $output/canon $output" > $output/kmc.canon.log 2>&1
+run_cmd "kmc -k$kmer_size -t$threads -ci2 ${in_cmd} $output/canon $output" > $output/kmc.canon.log 2>&1
 
 print_log "KMC no canonized counting (all k-mers)"
-run_cmd "kmc -k$kmer_size -t$threads -ci0 -b ${in_cmd} $output/all $output" > $output/kmc.all.log 2>&1
+run_cmd "kmc -k$kmer_size -t$threads -ci2 -b ${in_cmd} $output/all $output" > $output/kmc.all.log 2>&1
 
 print_log "Adding strand information"
 run_cmd "$TOOLS_PATH/kmersGWAS/bin/kmers_add_strand_information -c $output/canon -n $output/all -k $kmer_size -o $output/kmc31" > $output/kmers_add_strand_information.log 2>&1
