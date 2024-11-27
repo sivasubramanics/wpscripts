@@ -52,6 +52,7 @@ usage(){
     echo "  -s STR    Clara Parabricks SIF file (eg: $sif)"
     echo "  -b STR    bam/cram file"
     echo "  -r STR    reference genome"
+    echo "  -i STR    interval list (bed format)"
     echo "  -o STR    output prefix"
     echo "  -p INT    number of threads"
     echo "  -g        use GPU"
@@ -60,11 +61,12 @@ usage(){
 }
 
 # get options
-while getopts "s:b:r:o:p:hg" opt; do
+while getopts "s:b:r:i:o:p:hg" opt; do
     case $opt in
         s) sif=$OPTARG;;
         b) bam=$OPTARG;;
         r) ref=$OPTARG;;
+        i) intrbed=$OPTARG;;
         o) out_prefix=$OPTARG;;
         p) threads=$OPTARG;;
         h) usage;;
@@ -107,6 +109,12 @@ in_bam_path=$(dirname $(realpath $bam))
 in_bam_name=$(basename $bam)
 in_ref_path=$(dirname $(realpath $ref))
 in_ref_name=$(basename $ref)
+# if interval bed file is provided
+if [ ! -z $intrbed ]; then
+    is_exists $intrbed
+    in_intrbed_path=$(dirname $(realpath $intrbed))
+    in_intrbed_name=$(basename $intrbed)
+fi
 out_vcf_dir=$(realpath $out_dir/)
 tmp_dir=$(realpath $out_tmp/)
 out_gvcf_name=$(basename $out_prefix).clara.g.vcf.gz
@@ -120,6 +128,10 @@ if $is_gpu; then
 fi
 dv_cmd="$dv_cmd -B $in_bam_path:/bams"
 dv_cmd="$dv_cmd -B $in_ref_path:/genome"
+if [ ! -z $intrbed ]; then
+    dv_cmd="$dv_cmd -B $in_intrbed_path:/intervals"
+    dv_cmd="$dv_cmd --interval-file /intervals/$in_intrbed_name"
+fi
 dv_cmd="$dv_cmd -B $out_vcf_dir:/vcfs"
 dv_cmd="$dv_cmd -B $tmp_dir:/tmp"
 dv_cmd="$dv_cmd $sif"
