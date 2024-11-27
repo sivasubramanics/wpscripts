@@ -130,7 +130,6 @@ dv_cmd="$dv_cmd -B $in_bam_path:/bams"
 dv_cmd="$dv_cmd -B $in_ref_path:/genome"
 if [ ! -z $intrbed ]; then
     dv_cmd="$dv_cmd -B $in_intrbed_path:/intervals"
-    dv_cmd="$dv_cmd --interval-file /intervals/$in_intrbed_name"
 fi
 dv_cmd="$dv_cmd -B $out_vcf_dir:/vcfs"
 dv_cmd="$dv_cmd -B $tmp_dir:/tmp"
@@ -138,6 +137,9 @@ dv_cmd="$dv_cmd $sif"
 dv_cmd="$dv_cmd pbrun deepvariant"
 dv_cmd="$dv_cmd --ref /genome/$in_ref_name"
 dv_cmd="$dv_cmd --in-bam /bams/$in_bam_name"
+if [ ! -z $intrbed ]; then
+    dv_cmd="$dv_cmd --interval-file /intervals/$in_intrbed_name"
+fi
 dv_cmd="$dv_cmd --out-variants /vcfs/$out_gvcf_name"
 # dv_cmd="$dv_cmd --pb-model-file /usr/local/parabricks/binaries/model/75/shortread/deepvariant.eng"
 dv_cmd="$dv_cmd --gvcf"
