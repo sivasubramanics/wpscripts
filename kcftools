@@ -29,7 +29,7 @@ DEFAULT_TMP_DIR="/tmp"
 TMP_DIR=${KCFTOOLS_TMP_DIR:-$DEFAULT_TMP_DIR}
 
 # Set Java options
-JAVA_OPTS="-Xms256M -Xmx$HEAP_SIZE -Djava.io.tmpdir=$TMP_DIR"
+JAVA_OPTS=(-Xms256M -Xmx"$HEAP_SIZE" -Djava.io.tmpdir="$TMP_DIR")
 
 # Run the JAR file with Java options and any provided arguments
-exec java "$JAVA_OPTS" -jar "$JAR_FILE" "$@"
+exec java "${JAVA_OPTS[@]}" -jar "$JAR_FILE" "$@"
