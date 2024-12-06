@@ -1,0 +1,35 @@
+#!/bin/bash
+# if local host ends with .bioinformatics.nl then run the below command
+
+set -e
+set -x
+set -o pipefail
+
+# Get the directory of the script
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+
+# Set the path to the JAR file
+JAR_FILE="$SCRIPT_DIR/kcftools-0.0.1-SNAPSHOT.jar"
+
+# if the dnsdomainname == bioinformatics.nl then use the JAR file in the lustre directory : /lustre/BIF/nobackup/selva001/work/jars/
+if [[ $(dnsdomainname) == "bioinformatics.nl" ]]; then
+    JAR_FILE="/lustre/BIF/nobackup/selva001/work/jars/kcftools-0.0.1-SNAPSHOT.jar"
+fi
+
+# Default heap size 24GB
+DEFAULT_HEAP_SIZE="24G"
+
+# Use custom heap size if provided, otherwise use default
+HEAP_SIZE=${KCFTOOLS_HEAP_SIZE:-$DEFAULT_HEAP_SIZE}
+
+# Default tmp directory
+DEFAULT_TMP_DIR="/tmp"
+
+# Use custom tmp directory if provided, otherwise use default
+TMP_DIR=${KCFTOOLS_TMP_DIR:-$DEFAULT_TMP_DIR}
+
+# Set Java options
+JAVA_OPTS="-Xms256M -Xmx$HEAP_SIZE -Djava.io.tmpdir=$TMP_DIR"
+
+# Run the JAR file with Java options and any provided arguments
+exec java "$JAVA_OPTS" -jar "$JAR_FILE" "$@"
