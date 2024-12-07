@@ -1,8 +1,11 @@
 #!/bin/bash
 # if local host ends with .bioinformatics.nl then run the below command
 
+# this will set the script to exit if any statement returns a non-true return value
 set -e
-set -x
+## this will print each command before executing it
+#set -x
+# this will set the script to exit if any pipeline returns a non-true return value
 set -o pipefail
 
 # Get the directory of the script
