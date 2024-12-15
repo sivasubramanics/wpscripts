@@ -56,21 +56,25 @@ def get_ids(fa_name, asm_type):
     if asm_type == "trinity":
         # TRINITY_DN100000_c0_g1_i1
         g_id = re.search(r"(TRINITY_DN\d+_c\d+_g\d+)_i\d+", fa_name).group(1)
+        t_num = re.search(r"TRINITY_DN\d+_c\d+_g\d+_i(\d+)", fa_name).group(1)
         t_id = re.search(r"(TRINITY_DN\d+_c\d+_g\d+_i\d+)", fa_name).group(1)
     elif asm_type == "rnaspades":
         # NODE_1_length_15401_cov_332.591075_g0_i0
         g_id = re.search(r"NODE_\d+_length_\d+_cov_\d+.\d+_(g\d+)_i\d+", fa_name).group(1)
+        t_num = re.search(r"NODE_\d+_length_\d+_cov_\d+.\d+_g\d+_i(\d+)", fa_name).group(1)
         t_id = re.search(r"(NODE_\d+_length_\d+_cov_\d+.\d+_g\d+_i\d+)", fa_name).group(1)
     elif asm_type == "fasta":
         g_id = re.search(r"(.+)", fa_name).group(1)
         t_id = re.search(r"(.+)", fa_name).group(1)
+        t_num = -1
     elif asm_type == "evigene":
         g_id = re.search(r"(NonamEVm\d+)t\d+", fa_name).group(1)
+        t_num = re.search(r"NonamEVm\d+t(\d+)", fa_name).group(1)
         t_id = re.search(r"(NonamEVm\d+t\d+)", fa_name).group(1)
     else:
         print("Assembly type not recognized")
         sys.exit(1)
-    return g_id, t_id
+    return g_id, t_id, t_num
     
 
 def main():
@@ -95,15 +99,19 @@ def main():
     genes = defaultdict(list)
     n_genes = 0
     for fasta in parse_fasta(args.fasta):
-        g_id, t_id = get_ids(fasta.name, args.type)
+        g_id, t_id, t_num = get_ids(fasta.name, args.type)
         if g_id not in genes:
             n_genes += 1
             genes[g_id] = []
             genes[g_id].append(n_genes)
         genes[g_id].append(t_id)
         # get index of g_id in genes and add 1 to get the gene number
-        new_gene_name = f"{args.prefix}_g{genes[g_id][0]}"
-        new_isoforms_name = f"{new_gene_name}.i{genes[g_id].index(t_id)}"
+        if t_num != -1:
+            new_gene_name = f"{args.prefix}_g{genes[g_id][0]}"
+            new_isoforms_name = f"{new_gene_name}.i{t_num}"
+        else:
+            new_gene_name = f"{args.prefix}_g{genes[g_id][0]}"
+            new_isoforms_name = f"{new_gene_name}.i{genes[g_id].index(t_id)}"
         fm.write(f"{new_isoforms_name}\t{fasta.name}\n")
         fasta.name = new_isoforms_name
         fo.write(f"{str(fasta)}\n")
