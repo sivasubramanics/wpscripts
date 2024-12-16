@@ -25,7 +25,6 @@ def get_attributes(attributes, format='gtf'):
     return attributes
 
 
-
 def parse_annotation_file(annotation_file, output_file, format='gtf'):
     out_attributes = {}
     with open(annotation_file, 'r') as fh, open(output_file, 'w') as out:
@@ -58,6 +57,8 @@ def parse_gtf(annotation_file, output_file):
             line = line.strip().split('\t')
             attributes = get_attributes(line[8], format='gtf')
             if 'transcript_id' in attributes:
+                if line[2] == 'transcript':
+                    tr2gene[attributes['transcript_id']] = {'chrom': line[0], 'start': line[3], 'end': line[4], 'strand': line[6]}
                 if attributes['transcript_id'] not in tr2gene:
                     tr2gene[attributes['transcript_id']] = {'gene_id': '-', 'protein_id': '-'}
                 if 'gene_id' in attributes:
@@ -79,7 +80,7 @@ def main():
         tr2gene = parse_gtf(args.input, args.output)
         with open(args.output, 'w') as out:
             for tr in tr2gene:
-                out.write(f"{tr2gene[tr]['gene_id']}\t{tr}\t{tr2gene[tr]['protein_id']}\n")
+                out.write(f"{tr2gene[tr]['gene_id']}\t{tr}\t{tr2gene[tr]['protein_id']}\t{tr2gene[tr]['chrom']}\t{tr2gene[tr]['start']}\t{tr2gene[tr]['end']}\t{tr2gene[tr]['strand']}\n")
     elif args.format == 'gff':
         parse_annotation_file(args.input, args.output, args.format)
     else:
