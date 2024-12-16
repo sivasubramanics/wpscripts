@@ -59,6 +59,10 @@ def parse_gtf(annotation_file, output_file):
             if 'transcript_id' in attributes:
                 if line[2] == 'transcript':
                     tr2gene[attributes['transcript_id']] = {'chrom': line[0], 'start': line[3], 'end': line[4], 'strand': line[6]}
+                    if 'protein_id' not in tr2gene[attributes['transcript_id']]:
+                        tr2gene[attributes['transcript_id']]['protein_id'] = '-'
+                    if 'gene_id' not in tr2gene[attributes['transcript_id']]:
+                        tr2gene[attributes['transcript_id']]['gene_id'] = '-'
                 if attributes['transcript_id'] not in tr2gene:
                     tr2gene[attributes['transcript_id']] = {'gene_id': '-', 'protein_id': '-'}
                 if 'gene_id' in attributes:
