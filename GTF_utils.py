@@ -75,6 +75,69 @@ def get_gene_to_tr_map(input, output):
                 out_fh.write(f"{gene_id}\t{trans_id}\n")
 
 
+def get_transcripts_info(input, output):
+    """
+    Generate gene->transcript->protein information
+    :param input: input GTF file
+    :param output: output table
+    :return: None
+    """
+
+    class TR:
+        def __init__(self, GTFline):
+            self.transcript_id = GTFline.attribute_dict['transcript_id']
+            self.exons = 0
+            self.cds = 0
+            self.protein_id = None
+            self.gene_id = GTFline.attribute_dict['gene_id']
+            self.seqname = GTFline.seqname
+            self.strand = GTFline.strand
+            self.start = GTFline.start
+            self.end = GTFline.end
+            self.length = 0
+
+        def set_protein_id(self, protein_id):
+            self.protein_id = protein_id
+        def add_child(self, GTFline):
+            if GTFline.feature == 'exon':
+                self.exons += 1
+                self.length += GTFline.length
+            if GTFline.feature == 'CDS':
+                self.cds += 1
+                if 'protein_id' in GTFline.attribute_dict:
+                    self.set_protein_id(GTFline.attribute_dict['protein_id'])
+                else:
+                    if self.protein_id is None:
+                        self.set_protein_id(GTFline.attribute_dict['transcript_id'])
+
+        def __str__(self):
+            if not self.protein_id:
+                self.protein_id = '-'
+            return f"{self.transcript_id}\t{self.gene_id}\t{self.protein_id}\t{self.seqname}\t{self.strand}\t{self.start}\t{self.end}\t{self.length}\t{self.exons}\t{self.cds}"
+
+    # if output is not specified, create one
+    if not output:
+        output = input + '.transcripts_info'
+
+    # create a dictionary to hold the gene to transcript mapping
+    tr_dict = {}
+
+    # read the GTF file and generate the gene to transcript mapping
+    logging.info(f"reading GTF file: {input}")
+    for record in read_gtf(input):
+        if record.feature == 'transcript':
+            tr = TR(record)
+            tr_dict[tr.transcript_id] = tr
+        if record.feature in ['exon', 'CDS']:
+            tr_dict[record.attribute_dict['transcript_id']].add_child(record)
+
+    # write the gene to transcript mapping to the output table
+    logging.info(f"writing gene to transcript mapping to: {output}")
+    with open(output, 'w') as out_fh:
+        out_fh.write('transcript_id\tgene_id\tprotein_id\tseqname\tstrand\tstart\tend\tlength\texons\tcds\n')
+        for tr_id in tr_dict:
+            tr = tr_dict[tr_id]
+            out_fh.write(str(tr) + '\n')
 
 
 def main():
@@ -93,6 +156,10 @@ def main():
     gene_to_tr_map_parser.add_argument('-i', '--input', help='input GTF file', required=True)
     gene_to_tr_map_parser.add_argument('-o', '--output', help='output table, if not specified, input.gtf.gene_to_transcript_map', required=False)
 
+    transcripts_info = subparsers.add_parser('transcripts_info', help='generate gene->transcript->protein information', description='generate gene->transcript->protein information')
+    transcripts_info.add_argument('-i', '--input', help='input GTF file', required=True)
+    transcripts_info.add_argument('-o', '--output', help='output table, if not specified, input.gtf.transcripts_info', required=False)
+
     # parse the arguments and save to args
     args = parser.parse_args(args=None if sys.argv[1:] else ['--help'])
 
@@ -102,14 +169,13 @@ def main():
     # log the command line arguments provided, with the message "cmdline: ", and print on the stdout
     logging.info('cmdline: %s', ' '.join(sys.argv))
 
-
-
-
     # if subcommand is density, call the density function
     if args.command == 'density':
         get_density(args.input, args.output, args.type, args.mb)
     if args.command == 'gene_to_tr_map':
         get_gene_to_tr_map(args.input, args.output)
+    if args.command == 'transcripts_info':
+        get_transcripts_info(args.input, args.output)
 
 def get_density(in_gtf, out_table, feature, mb):
     """
