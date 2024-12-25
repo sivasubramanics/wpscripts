@@ -82,8 +82,7 @@ def main():
                             tr_per_cov[tr_id][sample_name] = float(fields[10])
                             tr_per_fpkm[tr_id][sample_name] = float(fields[11])
                         else:
-                            logging.error(f'Duplicate entry for {tr_id} in {sample_name}')
-                            sys.exit(1)
+                            logging.warning(f'Duplicate entry for {tr_id} in {sample_name}')
     logging.info(f'Found {len(tr_per_cov)} transcripts')
 
     # check if the transcript is expressed in any of the samples
