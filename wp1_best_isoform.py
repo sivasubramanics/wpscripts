@@ -117,6 +117,14 @@ def main():
     for fasta in parse_fasta(args.input):
         transcripts[fasta.name] = fasta
 
+    for gene in gene_to_tr:
+        for tr in gene_to_tr[gene]:
+            if tr not in transcripts:
+                # remove the transcript from the gene to transcript map
+                gene_to_tr[gene].remove(tr)
+                print(f"Transcript {tr} not found in the fasta file. Removing from the gene to transcript map.",
+                      file=sys.stderr)
+
     if args.type == 'len':
         # remove the output files if they exist
         os.remove(f"{args.output}.len.fa") if os.path.exists(f"{args.output}.len.fa") else None
