@@ -125,6 +125,12 @@ def main():
                 print(f"Transcript {tr} not found in the fasta file. Removing from the gene to transcript map.",
                       file=sys.stderr)
 
+    for gene in gene_to_tr:
+        if not gene_to_tr[gene]:
+            print(f"No transcripts found for gene {gene}. Removing from the gene to transcript map.", file=sys.stderr)
+            del gene_to_tr[gene]
+
+
     if args.type == 'len':
         # remove the output files if they exist
         os.remove(f"{args.output}.len.fa") if os.path.exists(f"{args.output}.len.fa") else None
