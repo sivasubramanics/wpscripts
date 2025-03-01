@@ -12,11 +12,11 @@ set -o pipefail
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
 # Set the path to the JAR file
-JAR_FILE="$SCRIPT_DIR/kcftools-0.0.1-SNAPSHOT.jar"
+JAR_FILE="$SCRIPT_DIR/kcftools-0.0.1.jar"
 
 # if the dnsdomainname == bioinformatics.nl then use the JAR file in the lustre directory : /lustre/BIF/nobackup/selva001/work/jars/
 if [[ $(dnsdomainname) == "bioinformatics.nl" ]]; then
-    JAR_FILE="/lustre/BIF/nobackup/selva001/work/jars/kcftools-0.0.1-SNAPSHOT.jar"
+    JAR_FILE="/lustre/BIF/nobackup/selva001/work/jars/kcftools-0.0.1.jar"
 fi
 
 # Default heap size 24GB
